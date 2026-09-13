@@ -1,0 +1,50 @@
+import { Router } from "express";
+import auth from "./auth.js";
+import users from "./users.js";
+import settings from "./settings.js";
+import employees from "./employees.js";
+import payroll from "./payroll.js";
+import income from "./income.js";
+import sales from "./sales.js";
+import expenses, { expenseCategoriesRouter } from "./expenses.js";
+import rent from "./rent.js";
+import goals from "./goals.js";
+import savings from "./savings.js";
+import vacations from "./vacations.js";
+import calendar from "./calendar.js";
+import products from "./products.js";
+import categories from "./categories.js";
+import menu from "./menu.js";
+import carousel from "./carousel.js";
+import orders from "./orders.js";
+import reports from "./reports.js";
+import audit from "./audit.js";
+import drive from "./drive.js";
+
+// Section 44 — one API namespace per resource. Deliberately NO /api/inventory.
+const router = Router();
+
+router.use("/auth", auth);
+router.use("/users", users);
+router.use("/settings", settings);
+router.use("/employees", employees);
+router.use("/payroll", payroll);
+router.use("/income", income);
+router.use("/sales", sales);
+router.use("/expenses/categories", expenseCategoriesRouter);
+router.use("/expenses", expenses);
+router.use("/rent", rent);
+router.use("/goals", goals);
+router.use("/savings", savings);
+router.use("/vacations", vacations);
+router.use("/calendar", calendar);
+router.use("/products", products);
+router.use("/categories", categories);
+router.use("/menu", menu);
+router.use("/carousel", carousel);
+router.use("/orders", orders);
+router.use("/reports", reports);
+router.use("/audit", audit);
+router.use("/drive", drive);
+
+export default router;

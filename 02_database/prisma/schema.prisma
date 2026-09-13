@@ -1,0 +1,415 @@
+// ============================================================
+// TENDITA LANDY — Database Schema
+// SANDBOX environment: SQLite (swap provider to postgresql for prod)
+// REGLA ABSOLUTA: NO existen modelos de inventario / stock / kardex.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // TODO(prod): switch to "postgresql" + DATABASE_URL
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// USERS, ROLES, PERMISSIONS
+// ------------------------------------------------------------
+
+enum RoleName {
+  ADMINISTRADOR
+  GESTION
+  OPERADOR
+  PADRE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  active       Boolean    @default(true)
+  roles        UserRole[]
+  orders       Order[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        RoleName         @unique
+  description String?
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id     String           @id @default(cuid())
+  key    String           @unique // e.g. "finance.view", "orders.manage"
+  label  String
+  roles  RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+// ------------------------------------------------------------
+// SETTINGS (todo valor financiero/operativo es configurable)
+// ------------------------------------------------------------
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "business.name", "whatsapp.number", "currency"
+  value     String
+  category  String   // BUSINESS | FINANCE | STORE | CAROUSEL | SYSTEM
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------------------------------
+// PAYROLL / NÓMINA
+// ------------------------------------------------------------
+
+model Employee {
+  id           String        @id @default(cuid())
+  name         String
+  dailySalary  Float
+  active       Boolean       @default(true)
+  startDate    DateTime
+  endDate      DateTime?
+  payrollDays  PayrollDay[]
+  createdAt    DateTime      @default(now())
+}
+
+model Payroll {
+  id        String       @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  total       Float
+  status      String     @default("PENDING") // PENDING | PAID
+  days        PayrollDay[]
+  createdAt   DateTime   @default(now())
+}
+
+model PayrollDay {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  payrollId  String?
+  payroll    Payroll? @relation(fields: [payrollId], references: [id])
+  date       DateTime
+  worked     Boolean  @default(false)
+  amount     Float    // dailySalary snapshot for that day (worked ? dailySalary : 0)
+}
+
+// ------------------------------------------------------------
+// EXPENSES / GASTOS
+// ------------------------------------------------------------
+
+model ExpenseCategory {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  expenses Expense[]
+}
+
+enum Periodicity {
+  DIARIO
+  SEMANAL
+  MENSUAL
+  ANUAL
+  PERSONALIZADO
+  EXTRAORDINARIO
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  concept     String
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  amount      Float
+  date        DateTime
+  periodicity Periodicity
+  description String?
+  status      String          @default("ACTIVE") // ACTIVE | INACTIVE
+  createdAt   DateTime        @default(now())
+}
+
+model RecurringExpense {
+  id          String      @id @default(cuid())
+  concept     String
+  amount      Float
+  periodicity Periodicity
+  startDate   DateTime
+  endDate     DateTime?
+  status      String      @default("ACTIVE")
+}
+
+// ------------------------------------------------------------
+// RENT / RENTA
+// ------------------------------------------------------------
+
+model Rent {
+  id          String      @id @default(cuid())
+  concept     String      @default("Renta")
+  value       Float
+  periodicity Periodicity
+  startDate   DateTime
+  endDate     DateTime?
+  status      String      @default("ACTIVE")
+  notes       String?
+  createdAt   DateTime    @default(now())
+}
+
+// ------------------------------------------------------------
+// INCOME / SALES
+// ------------------------------------------------------------
+
+model Income {
+  id     String   @id @default(cuid())
+  amount Float
+  date   DateTime
+  source String   @default("VENTA")
+  notes  String?
+}
+
+model Sale {
+  id        String     @id @default(cuid())
+  date      DateTime
+  total     Float
+  items     SaleItem[]
+  orderId   String?    @unique
+  order     Order?     @relation(fields: [orderId], references: [id])
+  createdAt DateTime   @default(now())
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+}
+
+// ------------------------------------------------------------
+// PRODUCTS / CATEGORIES  (NO STOCK — solo ACTIVO/INACTIVO)
+// ------------------------------------------------------------
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  icon     String?
+  active   Boolean   @default(true)
+  order    Int       @default(0)
+  products Product[]
+}
+
+model Product {
+  id          String     @id @default(cuid())
+  name        String
+  imageUrl    String?
+  description String?
+  price       Float
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  status      String     @default("ACTIVO") // ACTIVO | INACTIVO — never stock
+  schedule    String?    // optional time window, free text/JSON
+  order       Int        @default(0)
+  saleItems   SaleItem[]
+  orderItems  OrderItem[]
+  createdAt   DateTime   @default(now())
+}
+
+// ------------------------------------------------------------
+// GOALS / SAVINGS
+// ------------------------------------------------------------
+
+model Goal {
+  id            String      @id @default(cuid())
+  name          String
+  type          Periodicity
+  targetValue   Float
+  startDate     DateTime
+  endDate       DateTime
+  currentValue  Float       @default(0)
+  status        String      @default("ACTIVE")
+  notes         String?
+}
+
+model Savings {
+  id        String   @id @default(cuid())
+  label     String   // e.g. "Ahorro inicial", "Ahorro diario"
+  amount    Float
+  date      DateTime
+  type      String   // INICIAL | DIARIO | SEMANAL | MENSUAL | EXTRAORDINARIO
+  notes     String?
+}
+
+// ------------------------------------------------------------
+// SCHOOL CALENDAR / VACATIONS
+// ------------------------------------------------------------
+
+model SchoolCalendar {
+  id        String   @id @default(cuid())
+  label     String   // e.g. "Inicio de clases", "Festivo"
+  date      DateTime
+  type      String   // CLASS_START | CLASS_END | HOLIDAY | NO_CLASS | SPECIAL
+  notes     String?
+}
+
+model VacationPeriod {
+  id             String   @id @default(cuid())
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  days           Int
+  targetAmount   Float
+  currentSavings Float    @default(0)
+  notes          String?
+}
+
+// ------------------------------------------------------------
+// DAILY MENU
+// ------------------------------------------------------------
+
+model DailyMenu {
+  id     String          @id @default(cuid())
+  date   DateTime
+  active Boolean         @default(true)
+  items  DailyMenuItem[]
+}
+
+model DailyMenuItem {
+  id       String    @id @default(cuid())
+  menuId   String
+  menu     DailyMenu @relation(fields: [menuId], references: [id])
+  label    String    // e.g. "🌮 Tacos"
+  emoji    String?
+  order    Int       @default(0)
+}
+
+// ------------------------------------------------------------
+// CAROUSEL
+// ------------------------------------------------------------
+
+model Carousel {
+  id       String           @id @default(cuid())
+  maxSlots Int              @default(5)
+  images   CarouselImage[]
+}
+
+model CarouselImage {
+  id           String    @id @default(cuid())
+  carouselId   String
+  carousel     Carousel  @relation(fields: [carouselId], references: [id])
+  imageUrl     String
+  title        String?
+  description  String?
+  displaySeconds Int     @default(5)
+  startDate    DateTime?
+  endDate      DateTime?
+  active       Boolean   @default(true)
+  order        Int       @default(0)
+}
+
+// ------------------------------------------------------------
+// STUDENT / ORDERS
+// ------------------------------------------------------------
+
+model Student {
+  id     String  @id @default(cuid())
+  name   String
+  grade  String
+  group  String?
+  orders Order[]
+}
+
+enum OrderStatus {
+  RECIBIDO
+  EN_PREPARACION
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+model Order {
+  id          String              @id @default(cuid())
+  number      Int                 @unique @default(autoincrement())
+  date        DateTime            @default(now())
+  studentId   String
+  student     Student             @relation(fields: [studentId], references: [id])
+  userId      String?
+  user        User?               @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  total       Float
+  status      OrderStatus         @default(RECIBIDO)
+  statusHistory OrderStatusHistory[]
+  sale        Sale?
+  createdAt   DateTime            @default(now())
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus
+  changedAt DateTime    @default(now())
+  notes     String?
+}
+
+// ------------------------------------------------------------
+// NOTIFICATIONS / ALERTS
+// ------------------------------------------------------------
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // ALERT_RED | ALERT_ORANGE | ALERT_GREEN | ALERT_BLUE | INFO
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// AUDIT LOG
+// ------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // CREATE | UPDATE | DELETE
+  module     String   // e.g. "Rent", "Payroll"
+  recordId   String?
+  oldValue   String?  // JSON string
+  newValue   String?  // JSON string
+  createdAt  DateTime @default(now())
+}
