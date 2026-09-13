@@ -42,7 +42,7 @@ router.get(
       ]);
 
     const ventasHoy = salesToday._sum.total ?? 0;
-    const gastosHoy = expensesToday._sum.total ?? 0;
+    const gastosHoy = expensesToday._sum.amount ?? 0;
 
     res.json({
       ventasHoy,
