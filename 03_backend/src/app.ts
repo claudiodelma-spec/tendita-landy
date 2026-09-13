@@ -9,7 +9,11 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.CORS_ORIGIN }));
+  // Section 51: two separate public frontends (admin + tienda) must both be
+  // allowed to call this API. CORS_ORIGIN accepts a comma-separated list so a
+  // single env var can list both real deployment URLs (e.g. Render/Vercel).
+  const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+  app.use(cors({ origin: allowedOrigins }));
   app.use(express.json());
 
   app.get("/api/health", (_req, res) => {
