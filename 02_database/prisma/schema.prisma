@@ -25,16 +25,18 @@ enum RoleName {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  name         String
-  email        String     @unique
-  passwordHash String
-  active       Boolean    @default(true)
-  roles        UserRole[]
-  orders       Order[]
-  auditLogs    AuditLog[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                  String         @id @default(cuid())
+  name                String
+  email               String         @unique
+  passwordHash        String
+  active              Boolean        @default(true)
+  roles               UserRole[]
+  orders              Order[]
+  auditLogs           AuditLog[]
+  incomeEntries       Income[]
+  dailyExpenseEntries DailyExpense[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 }
 
 model Role {
@@ -181,11 +183,30 @@ model Rent {
 // ------------------------------------------------------------
 
 model Income {
-  id     String   @id @default(cuid())
-  amount Float
-  date   DateTime
-  source String   @default("VENTA")
-  notes  String?
+  id             String   @id @default(cuid())
+  amount         Float
+  date           DateTime @unique // normalizado a medianoche — un solo registro consolidado por día (sección 2)
+  source         String   @default("VENTA")
+  notes          String?
+  registeredById String?
+  registeredBy   User?    @relation(fields: [registeredById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Gastos del día: valor único manual por día para el Dashboard financiero
+// (sección 3 de la corrección). Deliberadamente separado del modelo Expense
+// (que es la lista categorizada de gastos usada en la pantalla Gastos y en
+// Reportes) para no mezclar ambos conceptos ni romper esas pantallas.
+model DailyExpense {
+  id             String   @id @default(cuid())
+  amount         Float
+  date           DateTime @unique
+  notes          String?
+  registeredById String?
+  registeredBy   User?    @relation(fields: [registeredById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Sale {
