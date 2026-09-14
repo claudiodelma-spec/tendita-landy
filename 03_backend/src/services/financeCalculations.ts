@@ -6,8 +6,98 @@ function daysBetween(from: Date, to: Date): number {
   return Math.max(1, Math.ceil((to.getTime() - from.getTime()) / DAY_MS));
 }
 
+function normalizeToDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 /**
- * BN-004 — Ahorro diario necesario (cálculo central del dashboard).
+ * Corrección "Dashboard financiero" (spec adicional) — reemplaza el cálculo
+ * que usaba el Dashboard (no las páginas de Metas/Vacaciones individuales,
+ * que siguen usando computeGoalProgress/computeVacationDailySavings sin
+ * cambios).
+ *
+ * VENTAS DEL DÍA (manual, modelo Income) - GASTOS DEL DÍA (manual, modelo
+ * DailyExpense) = GANANCIA NETA.
+ * OBJETIVO PRINCIPAL (Setting) + FONDO VACACIONES (Setting) = OBJETIVO TOTAL.
+ * OBJETIVO TOTAL - AHORRO ACUMULADO (suma real de Savings) = FALTA AHORRAR.
+ * FALTA AHORRAR / DÍAS RESTANTES (hasta Setting savings.targetEndDate) =
+ * AHORRO DIARIO NECESARIO.
+ */
+export async function computeDashboardSummary(referenceDate: Date = new Date()) {
+  const day = normalizeToDay(referenceDate);
+
+  const [incomeRow, expenseRow, savingsRows, settings] = await Promise.all([
+    prisma.income.findUnique({ where: { date: day } }),
+    prisma.dailyExpense.findUnique({ where: { date: day } }),
+    prisma.savings.findMany(),
+    prisma.setting.findMany({
+      where: { key: { in: ["savings.mainGoal", "savings.vacationFund", "savings.targetStartDate", "savings.targetEndDate"] } },
+    }),
+  ]);
+
+  const settingValue = (key: string, fallback: string) =>
+    settings.find((s: any) => s.key === key)?.value ?? fallback;
+
+  const ventasDia = incomeRow?.amount ?? 0;
+  const gastosDia = expenseRow?.amount ?? 0;
+  const gananciaNeta = ventasDia - gastosDia;
+
+  const objetivoPrincipal = Number(settingValue("savings.mainGoal", "0")) || 0;
+  const fondoVacaciones = Number(settingValue("savings.vacationFund", "0")) || 0;
+  const objetivoTotal = objetivoPrincipal + fondoVacaciones;
+
+  const ahorroAcumulado = savingsRows.reduce((sum: number, s: any) => sum + s.amount, 0);
+  const faltaAhorrar = Math.max(0, objetivoTotal - ahorroAcumulado);
+  const progreso = objetivoTotal > 0 ? Math.min(100, (ahorroAcumulado / objetivoTotal) * 100) : 0;
+
+  const targetEndDateStr = settingValue("savings.targetEndDate", "");
+  const targetEndDate = targetEndDateStr ? new Date(targetEndDateStr) : null;
+
+  let diasRestantes = 0;
+  let objetivoVencido = false;
+  if (targetEndDate) {
+    const msRemaining = targetEndDate.getTime() - day.getTime();
+    diasRestantes = Math.max(0, Math.ceil(msRemaining / DAY_MS));
+    if (msRemaining < 0 && faltaAhorrar > 0) objetivoVencido = true;
+  }
+
+  const ahorroDiarioNecesario =
+    diasRestantes > 0 ? Math.round((faltaAhorrar / diasRestantes) * 100) / 100 : faltaAhorrar > 0 ? faltaAhorrar : 0;
+
+  // Sección 8 — comparación ganancia neta vs. ahorro necesario (nunca ahorra automáticamente).
+  const ahorroRecomendado = Math.max(0, Math.min(gananciaNeta, ahorroDiarioNecesario));
+  const disponibleDespues = Math.max(0, gananciaNeta - ahorroDiarioNecesario);
+  const deficit = Math.max(0, ahorroDiarioNecesario - gananciaNeta);
+
+  return {
+    fecha: day.toISOString().slice(0, 10),
+    ventasDia,
+    gastosDia,
+    gananciaNeta,
+    objetivoPrincipal,
+    fondoVacaciones,
+    objetivoTotal,
+    ahorroAcumulado,
+    faltaAhorrar,
+    progreso: Math.round(progreso * 10) / 10,
+    ahorroDiarioNecesario,
+    diasRestantes,
+    objetivoVencido,
+    ahorroRecomendado,
+    disponibleDespues,
+    deficit,
+  };
+}
+
+
+/**
+ * BN-004 — Ahorro diario necesario (cálculo central del dashboard, ANTES de
+ * la corrección "Dashboard financiero" pedida por el usuario).
+ *
+ * NOTA: /api/reports/dashboard ahora usa computeDashboardSummary() (arriba),
+ * con la fórmula simplificada de esa corrección. Esta función se conserva
+ * intacta — no se usa en ningún endpoint hoy, pero no se elimina para no
+ * perder la lógica ni romper nada que pueda depender de ella más adelante.
  *
  *   pagos_previstos      = renta_activa + nomina_prevista + gastos_previstos
  *   dinero_disponible    = ahorro_acumulado

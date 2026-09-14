@@ -20,6 +20,11 @@ async function main() {
       { key: "system.timezone", value: "America/Mexico_City", category: "SYSTEM" },
       { key: "system.environment", value: "SANDBOX", category: "SYSTEM" },
       { key: "carousel.maxImages", value: "5", category: "CAROUSEL" },
+      // Corrección "Dashboard financiero" — objetivo de ahorro configurable (sección 5).
+      { key: "savings.mainGoal", value: "20000", category: "FINANCE" },
+      { key: "savings.vacationFund", value: "10000", category: "FINANCE" },
+      { key: "savings.targetStartDate", value: "2026-09-01", category: "FINANCE" },
+      { key: "savings.targetEndDate", value: "2026-12-31", category: "FINANCE" },
     ],
   });
 
@@ -211,6 +216,19 @@ async function main() {
       },
       statusHistory: { create: [{ status: OrderStatus.RECIBIDO }] },
     },
+  });
+
+  // --- Ventas y Gastos del día (corrección "Dashboard financiero") ---
+  const today = new Date();
+  const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  await prisma.income.create({
+    data: { date: todayNormalized, amount: 2500, notes: "Demo", registeredById: admin.id },
+  });
+  await prisma.dailyExpense.create({
+    data: { date: todayNormalized, amount: 1000, notes: "Demo", registeredById: admin.id },
+  });
+  await prisma.savings.create({
+    data: { label: "Ahorro real demo", amount: 1550, date: todayNormalized, type: "EXTRAORDINARIO" },
   });
 
   console.log("✅ Seed DEMO completado (SANDBOX). Usuarios demo (password: Demo1234!):");

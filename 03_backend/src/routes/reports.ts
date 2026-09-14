@@ -2,59 +2,21 @@ import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { computeDailySavingsNeeded } from "../services/financeCalculations.js";
+import { computeDashboardSummary } from "../services/financeCalculations.js";
 
 const router = Router();
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-function startOfWeek(d: Date) {
-  const day = d.getDay();
-  const diff = (day + 6) % 7; // Monday-start week
-  return startOfDay(new Date(d.getTime() - diff * 24 * 60 * 60 * 1000));
-}
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-// Section 8/9: the single aggregate endpoint the admin Dashboard renders from.
+// Corrección "Dashboard financiero" — únicamente los 7 indicadores pedidos
+// (sección 1), sin Total alumnos. Acepta ?date=YYYY-MM-DD para consultar
+// días anteriores (sección 16 — histórico).
 router.get(
   "/dashboard",
   requireAuth,
   requireRole("ADMINISTRADOR", "GESTION"),
-  asyncHandler(async (_req, res) => {
-    const now = new Date();
-    const todayStart = startOfDay(now);
-    const weekStart = startOfWeek(now);
-    const monthStart = startOfMonth(now);
-
-    const [salesToday, salesWeek, salesMonth, expensesToday, studentCount, savingsCalc, goals, vacations] =
-      await Promise.all([
-        prisma.sale.aggregate({ _sum: { total: true }, where: { date: { gte: todayStart } } }),
-        prisma.sale.aggregate({ _sum: { total: true }, where: { date: { gte: weekStart } } }),
-        prisma.sale.aggregate({ _sum: { total: true }, where: { date: { gte: monthStart } } }),
-        prisma.expense.aggregate({ _sum: { amount: true }, where: { date: { gte: todayStart }, status: "ACTIVE" } }),
-        prisma.student.count(),
-        computeDailySavingsNeeded(now),
-        prisma.goal.findMany({ where: { status: "ACTIVE" } }),
-        prisma.vacationPeriod.findMany(),
-      ]);
-
-    const ventasHoy = salesToday._sum.total ?? 0;
-    const gastosHoy = expensesToday._sum.amount ?? 0;
-
-    res.json({
-      ventasHoy,
-      ventasSemana: salesWeek._sum.total ?? 0,
-      ventasMes: salesMonth._sum.total ?? 0,
-      gananciaNeta: ventasHoy - gastosHoy,
-      gastosHoy,
-      totalAlumnos: studentCount,
-      metas: goals,
-      vacaciones: vacations,
-      ahorroDiario: savingsCalc,
-    });
+  asyncHandler(async (req, res) => {
+    const date = req.query.date ? new Date(String(req.query.date)) : new Date();
+    const summary = await computeDashboardSummary(date);
+    res.json(summary);
   })
 );
 

@@ -12,9 +12,10 @@ function normalizeToDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-// Corrección "Dashboard financiero", sección 2 — "Ventas del día": ingreso
-// manual, un único registro consolidado por día. Reutiliza el modelo Income
-// (existente desde la Fase 1, sin usar hasta ahora) en vez de crear uno nuevo.
+// Corrección "Dashboard financiero", sección 3 — "Gastos del día": ingreso
+// manual, un único registro consolidado por día. Modelo NUEVO (DailyExpense),
+// deliberadamente separado de Expense (la lista categorizada que usan las
+// pantallas Gastos y Reportes) para no mezclar ambos conceptos.
 const upsertSchema = z.object({
   date: z.coerce.date(),
   amount: z.number().min(0, "No se permiten valores negativos"),
@@ -28,16 +29,14 @@ router.get(
   asyncHandler(async (req, res) => {
     if (req.query.date) {
       const day = normalizeToDay(new Date(String(req.query.date)));
-      const row = await prisma.income.findUnique({ where: { date: day } });
+      const row = await prisma.dailyExpense.findUnique({ where: { date: day } });
       return res.json(row);
     }
-    const rows = await prisma.income.findMany({ orderBy: { date: "desc" } });
+    const rows = await prisma.dailyExpense.findMany({ orderBy: { date: "desc" } });
     res.json(rows);
   })
 );
 
-// Upsert por día — sección 2: "Si el administrador vuelve a editar el valor
-// del mismo día, debe actualizar el registro existente y NO crear otro".
 router.post(
   "/",
   requireAuth,
@@ -45,9 +44,9 @@ router.post(
   validateBody(upsertSchema),
   asyncHandler(async (req, res) => {
     const day = normalizeToDay(req.body.date);
-    const existing = await prisma.income.findUnique({ where: { date: day } });
+    const existing = await prisma.dailyExpense.findUnique({ where: { date: day } });
 
-    const row = await prisma.income.upsert({
+    const row = await prisma.dailyExpense.upsert({
       where: { date: day },
       update: { amount: req.body.amount, notes: req.body.notes, registeredById: req.user?.id },
       create: {
@@ -61,7 +60,7 @@ router.post(
     await logAudit({
       userId: req.user?.id,
       action: existing ? "UPDATE" : "CREATE",
-      module: "Income",
+      module: "DailyExpense",
       recordId: row.id,
       oldValue: existing ? { amount: existing.amount } : undefined,
       newValue: { amount: row.amount, date: row.date },
