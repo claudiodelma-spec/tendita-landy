@@ -13,8 +13,18 @@ import type {
 
 // Section 44 endpoints — one function per resource, thin wrappers over `api`.
 export const financeService = {
-  // Dashboard (BN-004 aggregate)
-  getDashboard: () => api.get<DashboardSummary>("/reports/dashboard"),
+  // Dashboard (corrección "Dashboard financiero" — acepta fecha para histórico)
+  getDashboard: (date?: string) => api.get<DashboardSummary>(`/reports/dashboard${date ? `?date=${date}` : ""}`),
+
+  // Ventas del día (manual, upsert por día — sección 2 de la corrección)
+  getIncomeForDate: (date: string) => api.get<{ id: string; amount: number; notes?: string } | null>(`/income?date=${date}`),
+  upsertIncome: (date: string, amount: number, notes?: string) => api.post<any>("/income", { date, amount, notes }),
+
+  // Gastos del día (manual, upsert por día — sección 3 de la corrección)
+  getDailyExpenseForDate: (date: string) =>
+    api.get<{ id: string; amount: number; notes?: string } | null>(`/daily-expenses?date=${date}`),
+  upsertDailyExpense: (date: string, amount: number, notes?: string) =>
+    api.post<any>("/daily-expenses", { date, amount, notes }),
 
   // Renta (BN-001)
   listRents: () => api.get<Rent[]>("/rent"),

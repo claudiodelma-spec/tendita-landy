@@ -78,24 +78,21 @@ export interface VacationPeriod {
   notes?: string | null;
 }
 
-export interface DailySavingsCalc {
-  pagosPrevistos: number;
-  dineroDisponible: number;
-  metasPendientes: number;
-  vacacionesFaltante: number;
-  necesidadRestante: number;
-  diasRestantes: number;
-  ahorroDiarioNecesario: number;
-}
-
 export interface DashboardSummary {
-  ventasHoy: number;
-  ventasSemana: number;
-  ventasMes: number;
+  fecha: string;
+  ventasDia: number;
+  gastosDia: number;
   gananciaNeta: number;
-  gastosHoy: number;
-  totalAlumnos: number;
-  metas: Goal[];
-  vacaciones: VacationPeriod[];
-  ahorroDiario: DailySavingsCalc;
+  objetivoPrincipal: number;
+  fondoVacaciones: number;
+  objetivoTotal: number;
+  ahorroAcumulado: number;
+  faltaAhorrar: number;
+  progreso: number;
+  ahorroDiarioNecesario: number;
+  diasRestantes: number;
+  objetivoVencido: boolean;
+  ahorroRecomendado: number;
+  disponibleDespues: number;
+  deficit: number;
 }

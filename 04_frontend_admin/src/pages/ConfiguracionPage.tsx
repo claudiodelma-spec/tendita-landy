@@ -20,6 +20,10 @@ const KEY_LABELS: Record<string, string> = {
   "system.timezone": "Zona horaria",
   "system.environment": "Entorno",
   "carousel.maxImages": "Máximo de imágenes activas",
+  "savings.mainGoal": "Objetivo principal de ahorro ($)",
+  "savings.vacationFund": "Fondo de vacaciones ($)",
+  "savings.targetStartDate": "Fecha inicial del objetivo (AAAA-MM-DD)",
+  "savings.targetEndDate": "Fecha final del objetivo (AAAA-MM-DD)",
 };
 
 // Section 33 — Configuración: todo valor editable desde aquí, nunca fijo en el código.
