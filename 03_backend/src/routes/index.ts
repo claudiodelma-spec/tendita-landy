@@ -21,6 +21,7 @@ import orders from "./orders.js";
 import reports from "./reports.js";
 import audit from "./audit.js";
 import drive from "./drive.js";
+import publicRoutes from "./public.js";
 
 // Section 44 — one API namespace per resource. Deliberately NO /api/inventory.
 const router = Router();
@@ -48,5 +49,6 @@ router.use("/orders", orders);
 router.use("/reports", reports);
 router.use("/audit", audit);
 router.use("/drive", drive);
+router.use("/public", publicRoutes);
 
 export default router;
