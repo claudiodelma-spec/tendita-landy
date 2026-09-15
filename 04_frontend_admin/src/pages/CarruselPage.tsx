@@ -1,47 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { Plus, Trash2, Cloud } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Modal } from "../components/Modal";
+import { ImageUploadInput } from "../components/ImageUploadInput";
 import { storeService } from "../services/storeService";
-import { driveService } from "../services/driveService";
 import type { Carousel } from "../types/store";
 
 // Section 23 — Carrusel: máximo 5 imágenes activas, reordenar, activar/desactivar,
 // tiempo de exposición. El límite de 5 lo aplica el backend (POST /carousel/images).
+// Las fotos son reales (subidas desde el dispositivo, comprimidas en el
+// navegador) — ver components/ImageUploadInput.tsx.
 export function CarruselPage() {
   const [carousel, setCarousel] = useState<Carousel | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ imageUrl: "", title: "", displaySeconds: "5" });
-  const [mockUploading, setMockUploading] = useState(false);
 
   function load() {
     storeService.getCarousel().then(setCarousel);
   }
   useEffect(load, []);
 
-  // Section 35 — Google Drive en modo MOCK: simula la subida y devuelve una
-  // URL falsa, para poder construir/probar el flujo antes de conectar Drive real.
-  async function simulateDriveUpload() {
-    if (!form.title.trim()) {
-      setError("Escribe un título/nombre de archivo antes de simular la subida.");
-      return;
-    }
-    setMockUploading(true);
-    setError(null);
-    try {
-      const result = await driveService.mockUpload(`${form.title.trim()}.jpg`);
-      setForm((f) => ({ ...f, imageUrl: result.driveUrl }));
-    } catch (err: any) {
-      setError(err.message ?? "No se pudo simular la subida a Drive");
-    } finally {
-      setMockUploading(false);
-    }
-  }
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!form.imageUrl) {
+      setError("Sube una foto antes de guardar.");
+      return;
+    }
     try {
       await storeService.addCarouselImage({
         imageUrl: form.imageUrl,
@@ -90,12 +76,15 @@ export function CarruselPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {images.map((img) => (
           <Card key={img.id}>
-            <div className="h-28 rounded-lg bg-gradient-to-br from-pink-200 to-orange-200 flex items-center justify-center text-4xl mb-3">
-              🖼️
-            </div>
+            {img.imageUrl ? (
+              <img src={img.imageUrl} alt="" className="h-28 w-full object-cover rounded-lg mb-3" />
+            ) : (
+              <div className="h-28 rounded-lg bg-gradient-to-br from-pink-200 to-orange-200 flex items-center justify-center text-4xl mb-3">
+                🖼️
+              </div>
+            )}
             <p className="font-medium text-slate-800 text-sm truncate">{img.title ?? "Sin título"}</p>
-            <p className="text-xs text-slate-400 mb-2 truncate">{img.imageUrl}</p>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mt-2">
               <button
                 onClick={() => toggleActive(img.id, img.active)}
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -116,27 +105,12 @@ export function CarruselPage() {
       <Modal open={modalOpen} title="Agregar imagen al carrusel" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleCreate} className="space-y-3">
           {error && <p className="text-sm text-rose-600">{error}</p>}
+          <ImageUploadInput value={form.imageUrl} onChange={(v) => setForm({ ...form, imageUrl: v })} label="Foto" />
           <input
-            placeholder="Título (usado también como nombre de archivo simulado)"
+            placeholder="Título (opcional)"
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <button
-            type="button"
-            onClick={simulateDriveUpload}
-            disabled={mockUploading}
-            className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 text-slate-500 rounded-lg py-2 text-xs hover:bg-slate-50 disabled:opacity-60"
-          >
-            <Cloud className="h-3.5 w-3.5" />
-            {mockUploading ? "Simulando subida a Drive…" : "Simular subida a Google Drive (mock)"}
-          </button>
-          <input
-            required
-            placeholder="URL de la imagen (o usa el botón de arriba)"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-            value={form.imageUrl}
-            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
           />
           <input
             type="number"

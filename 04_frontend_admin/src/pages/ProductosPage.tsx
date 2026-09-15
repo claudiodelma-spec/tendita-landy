@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { Card } from "../components/Card";
 import { Modal } from "../components/Modal";
 import { DataTable } from "../components/DataTable";
+import { ImageUploadInput } from "../components/ImageUploadInput";
 import { storeService } from "../services/storeService";
 import type { Category, Product } from "../types/store";
 
@@ -11,7 +12,7 @@ export function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", price: "", categoryId: "", description: "" });
+  const [form, setForm] = useState({ name: "", price: "", categoryId: "", description: "", imageUrl: "" });
 
   function load() {
     storeService.listProducts().then(setProducts);
@@ -26,10 +27,11 @@ export function ProductosPage() {
       price: Number(form.price),
       categoryId: form.categoryId,
       description: form.description || undefined,
+      imageUrl: form.imageUrl || undefined,
       status: "ACTIVO",
     });
     setModalOpen(false);
-    setForm({ name: "", price: "", categoryId: "", description: "" });
+    setForm({ name: "", price: "", categoryId: "", description: "", imageUrl: "" });
     load();
   }
 
@@ -55,6 +57,17 @@ export function ProductosPage() {
           rows={products}
           emptyMessage="Aún no hay productos."
           columns={[
+            {
+              header: "Foto",
+              render: (p) =>
+                p.imageUrl ? (
+                  <img src={p.imageUrl} alt="" className="h-10 w-10 object-cover rounded-lg" />
+                ) : (
+                  <span className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 text-xs">
+                    —
+                  </span>
+                ),
+            },
             { header: "Nombre", render: (p) => p.name },
             {
               header: "Categoría",
@@ -80,6 +93,7 @@ export function ProductosPage() {
 
       <Modal open={modalOpen} title="Nuevo producto" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleCreate} className="space-y-3">
+          <ImageUploadInput value={form.imageUrl} onChange={(v) => setForm({ ...form, imageUrl: v })} label="Foto del producto" />
           <input
             required
             placeholder="Nombre"
