@@ -7,14 +7,14 @@ import { IS_SANDBOX } from "../config/api";
 
 export function StoreLayout() {
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 max-w-md mx-auto relative">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white pb-28 max-w-md mx-auto relative">
       {IS_SANDBOX && (
         <div className="bg-amber-100 text-amber-700 text-[11px] text-center py-1 font-medium">
-          🧪 MODO DEMO / SANDBOX — ningún pedido es real
+          🧪 MODO DEMO — ningún pedido es real
         </div>
       )}
       <TopBar />
-      <div className="space-y-4 pb-4">
+      <div className="pb-4">
         <Outlet />
       </div>
       <CartBar />

@@ -1,27 +1,18 @@
 import { api } from "./apiClient";
 import type { Category, Product, DailyMenu, Carousel, Order } from "../types/store";
 
+// Tienda pública — sin autenticación. Todo pasa por /api/public/*.
 export const storeService = {
-  // Section 21-26: the parent-facing catalog. Categories/products come back
-  // unfiltered from the API today — the store UI filters to `active`/`ACTIVO`
-  // itself (see HomePage/ProductsPage) until a dedicated public endpoint exists.
-  listActiveCategories: async () => {
-    const categories = await api.get<Category[]>("/categories");
-    return categories.filter((c) => c.active).sort((a, b) => a.order - b.order);
-  },
-  listActiveProducts: async () => {
-    const products = await api.get<Product[]>("/products");
-    return products.filter((p) => p.status === "ACTIVO").sort((a, b) => a.order - b.order);
-  },
-  getTodayMenu: () => api.get<DailyMenu | null>("/menu/today"),
-  getCarousel: () => api.get<Carousel | null>("/carousel"),
+  listActiveCategories: () => api.get<Category[]>("/public/categories"),
+  listActiveProducts: () => api.get<Product[]>("/public/products"),
+  getTodayMenu: () => api.get<DailyMenu | null>("/public/menu/today"),
+  getCarousel: () => api.get<Carousel | null>("/public/carousel"),
+  getBusinessInfo: () => api.get<{ name: string; logo: string }>("/public/business-info"),
 
-  // Section 29/30 — creates the order and returns the ready-to-open WhatsApp link.
+  // Section 29/30 — crea el pedido y devuelve el link de WhatsApp listo para abrir.
   createOrder: (data: {
     student: { name: string; grade: string; group?: string };
     items: { productId: string; quantity: number }[];
   }) =>
-    api.post<{ order: Order; whatsappMessage: string; whatsappUrl: string; mode: string }>("/orders", data),
-
-  listMyOrders: () => api.get<Order[]>("/orders"),
+    api.post<{ order: Order; whatsappMessage: string; whatsappUrl: string; mode: string }>("/public/orders", data),
 };

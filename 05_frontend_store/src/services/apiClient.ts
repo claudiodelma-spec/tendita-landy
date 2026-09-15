@@ -1,17 +1,6 @@
 import { API_BASE_URL } from "../config/api";
 
-const TOKEN_KEY = "tendita_landy_store_token";
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
+// Tienda pública — sin login, así que no hay token que adjuntar.
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -21,12 +10,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
   });

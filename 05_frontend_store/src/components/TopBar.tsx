@@ -1,19 +1,27 @@
-import React from "react";
-import { Bell } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { storeService } from "../services/storeService";
 
 export function TopBar() {
+  const [businessName, setBusinessName] = useState("Tendita Landy");
+
+  useEffect(() => {
+    storeService
+      .getBusinessInfo()
+      .then((info) => info.name && setBusinessName(info.name))
+      .catch(() => {});
+  }, []);
+
   return (
-    <header className="flex items-center justify-between px-4 pt-4 pb-2">
-      <div className="flex items-center gap-2">
-        <span className="h-9 w-9 rounded-full bg-gradient-to-br from-pink-400 to-orange-300 flex items-center justify-center text-white font-bold text-sm">
+    <header className="flex items-center justify-between px-5 pt-5 pb-1">
+      <div className="flex items-center gap-2.5">
+        <span className="h-10 w-10 rounded-2xl bg-gradient-to-br from-pink-500 to-orange-400 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-pink-200">
           TL
         </span>
         <div>
-          <p className="font-semibold text-slate-800 leading-tight text-sm">Tendita Landy</p>
-          <p className="text-[10px] text-slate-400">Escuela · Sabor · Control</p>
+          <p className="font-bold text-slate-900 leading-tight">{businessName}</p>
+          <p className="text-[11px] text-slate-400">Escuela · Sabor · Control</p>
         </div>
       </div>
-      <Bell className="h-5 w-5 text-slate-400" />
     </header>
   );
 }
