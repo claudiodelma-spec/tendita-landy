@@ -2,6 +2,9 @@ TENDITA LANDY — Sistema de Gestión Escolar + Tienda para Padres
 ⚠️ SANDBOX / DEMO — sin datos reales, sin WhatsApp real, sin Google Drive real hasta aprobar todas las pruebas (ver sección 50 del spec original).
 Corrección aplicada — Dashboard financiero (post-lanzamiento)
 Ventas y Gastos del día pasaron a ser manuales (un registro por día, editable sin duplicar — reutiliza `Income` y agrega `DailyExpense`), Ganancia neta se sigue calculando sola, se agregó un Objetivo de ahorro configurable (Objetivo principal + Fondo de vacaciones = Objetivo total, en `Setting`), y se quitó "Total alumnos" del Dashboard. Detalle completo en `01_requirements/business-rules.md` (BN-011).
+Corrección aplicada — Tienda pública sin login (post-lanzamiento)
+La tienda para padres ya no pide usuario/contraseña — es una tienda en línea abierta al público general, con subida de fotos reales (sin servicios externos, comprimidas en el navegador) para Productos y Carrusel. Detalle en `01_requirements/business-rules.md` (BN-012).
+
 Estado (Fase 12 — TODAS las fases completadas)
 [x] Fases 0–10: arquitectura, backend completo, autenticación/roles, admin (Dashboard, Rentas, Nómina, Gastos, Metas y Ahorro, Vacaciones, Productos, Categorías, Menú, Carrusel, Pedidos, Configuración, Reportes, Usuarios, Auditoría), tienda para padres, WhatsApp configurable, Google Drive mock + backups
 [x] Fase 11 — Pruebas integrales: 15 TEST + 5 ESCENARIOS de las secciones 41/42 escritos como pruebas automatizadas (`03_backend/tests/integration/business-rules.test.ts`) contra la API real vía `supertest`. Tipado sin errores (`npm run typecheck:tests`). No se pudieron ejecutar en este chat por el mismo bloqueo de red a `binaries.prisma.sh` documentado desde la Fase 1 — listas para correr en cualquier máquina normal
