@@ -95,4 +95,27 @@ export interface DashboardSummary {
   ahorroRecomendado: number;
   disponibleDespues: number;
   deficit: number;
+  gastosOperativos: {
+    rentaSemanal: number;
+    nominaSemanal: number;
+    gastosSemanal: number;
+    pagosSemanales: number;
+    ahorroDiarioNecesario: number;
+  };
+  metaGanancia: {
+    profitGoal: number;
+    gananciaAcumulada: number;
+    faltante: number;
+    progreso: number;
+    diasRestantes: number;
+    metaVencida: boolean;
+    gananciaDiariaNecesaria: number;
+  };
+}
+
+export interface EvolutionPoint {
+  fecha: string;
+  ventas: number;
+  gastos: number;
+  ganancia: number;
 }

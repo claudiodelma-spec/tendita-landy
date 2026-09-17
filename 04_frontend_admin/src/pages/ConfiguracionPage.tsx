@@ -24,6 +24,9 @@ const KEY_LABELS: Record<string, string> = {
   "savings.vacationFund": "Fondo de vacaciones ($)",
   "savings.targetStartDate": "Fecha inicial del objetivo (AAAA-MM-DD)",
   "savings.targetEndDate": "Fecha final del objetivo (AAAA-MM-DD)",
+  "finance.profitGoal": "Meta de ganancia ($)",
+  "finance.profitGoalStartDate": "Fecha inicial de la meta de ganancia (AAAA-MM-DD)",
+  "finance.profitGoalEndDate": "Fecha final de la meta de ganancia (AAAA-MM-DD)",
 };
 
 // Section 33 — Configuración: todo valor editable desde aquí, nunca fijo en el código.

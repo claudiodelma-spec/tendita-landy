@@ -41,9 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Gestión Financiera",
     items: [
-      { to: "/rentas", label: "Rentas", icon: Building2, permission: "finance.view" },
-      { to: "/nomina", label: "Nómina", icon: Users2, permission: "finance.view" },
-      { to: "/gastos", label: "Gastos", icon: TrendingDown, permission: "finance.view" },
+      { to: "/gestion-operativa", label: "Renta, Nómina y Gastos", icon: Building2, permission: "finance.view" },
       { to: "/metas-ahorro", label: "Metas y Ahorro", icon: Target, permission: "finance.view" },
       { to: "/vacaciones", label: "Vacaciones", icon: Palmtree, permission: "finance.view" },
     ],

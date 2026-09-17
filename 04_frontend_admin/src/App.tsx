@@ -4,9 +4,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { RentaPage } from "./pages/RentaPage";
-import { NominaPage } from "./pages/NominaPage";
-import { GastosPage } from "./pages/GastosPage";
+import { GestionOperativaPage } from "./pages/GestionOperativaPage";
 import { MetasAhorroPage } from "./pages/MetasAhorroPage";
 import { VacacionesPage } from "./pages/VacacionesPage";
 import { ProductosPage } from "./pages/ProductosPage";
@@ -38,9 +36,7 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/rentas" element={<RentaPage />} />
-        <Route path="/nomina" element={<NominaPage />} />
-        <Route path="/gastos" element={<GastosPage />} />
+        <Route path="/gestion-operativa" element={<GestionOperativaPage />} />
         <Route path="/metas-ahorro" element={<MetasAhorroPage />} />
         <Route path="/vacaciones" element={<VacacionesPage />} />
         <Route path="/productos" element={<ProductosPage />} />
