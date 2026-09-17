@@ -4,6 +4,8 @@ Corrección aplicada — Dashboard financiero (post-lanzamiento)
 Ventas y Gastos del día pasaron a ser manuales (un registro por día, editable sin duplicar — reutiliza `Income` y agrega `DailyExpense`), Ganancia neta se sigue calculando sola, se agregó un Objetivo de ahorro configurable (Objetivo principal + Fondo de vacaciones = Objetivo total, en `Setting`), y se quitó "Total alumnos" del Dashboard. Detalle completo en `01_requirements/business-rules.md` (BN-011).
 Corrección aplicada — Tienda pública sin login (post-lanzamiento)
 La tienda para padres ya no pide usuario/contraseña — es una tienda en línea abierta al público general, con subida de fotos reales (sin servicios externos, comprimidas en el navegador) para Productos y Carrusel. Detalle en `01_requirements/business-rules.md` (BN-012).
+Ajuste posterior — Gestión operativa unificada + Meta de ganancia + Evolución (post-lanzamiento)
+Renta, Nómina y Gastos ahora son una sola pantalla con pestañas. "Ahorro" volvió a significar el dinero necesario por día para cubrir Renta+Nómina+Gastos (cálculo revivido de BN-004). Se agregó una Meta de ganancia configurable con progreso automático, un gráfico de evolución semanal/mensual/histórico en el Dashboard, y editar/eliminar en todas las pantallas que solo tenían crear. Detalle en `01_requirements/business-rules.md` (BN-013).
 
 Estado (Fase 12 — TODAS las fases completadas)
 [x] Fases 0–10: arquitectura, backend completo, autenticación/roles, admin (Dashboard, Rentas, Nómina, Gastos, Metas y Ahorro, Vacaciones, Productos, Categorías, Menú, Carrusel, Pedidos, Configuración, Reportes, Usuarios, Auditoría), tienda para padres, WhatsApp configurable, Google Drive mock + backups
