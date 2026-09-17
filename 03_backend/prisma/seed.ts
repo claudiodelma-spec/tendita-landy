@@ -25,6 +25,10 @@ async function main() {
       { key: "savings.vacationFund", value: "10000", category: "FINANCE" },
       { key: "savings.targetStartDate", value: "2026-09-01", category: "FINANCE" },
       { key: "savings.targetEndDate", value: "2026-12-31", category: "FINANCE" },
+      // NUEVO — Meta de ganancia (pedido posterior del usuario).
+      { key: "finance.profitGoal", value: "15000", category: "FINANCE" },
+      { key: "finance.profitGoalStartDate", value: "2026-09-01", category: "FINANCE" },
+      { key: "finance.profitGoalEndDate", value: "2026-12-31", category: "FINANCE" },
     ],
   });
 

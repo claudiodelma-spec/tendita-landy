@@ -87,4 +87,69 @@ router.put(
   })
 );
 
+router.put(
+  "/:id",
+  requireAuth,
+  requireRole("ADMINISTRADOR"),
+  validateBody(
+    z.object({
+      name: z.string().min(1).optional(),
+      roleNames: z.array(z.enum(["ADMINISTRADOR", "GESTION", "OPERADOR", "PADRE"])).min(1).optional(),
+    })
+  ),
+  asyncHandler(async (req, res) => {
+    const before = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!before) throw new ApiError(404, "Usuario no encontrado");
+
+    if (req.body.name) {
+      await prisma.user.update({ where: { id: req.params.id }, data: { name: req.body.name } });
+    }
+    if (req.body.roleNames) {
+      const roles = await prisma.role.findMany({ where: { name: { in: req.body.roleNames } } });
+      await prisma.userRole.deleteMany({ where: { userId: req.params.id } });
+      await prisma.userRole.createMany({
+        data: roles.map((r: any) => ({ userId: req.params.id, roleId: r.id })),
+      });
+    }
+
+    const updated = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      include: { roles: { include: { role: true } } },
+    });
+
+    await logAudit({ userId: req.user?.id, action: "UPDATE", module: "User", recordId: req.params.id });
+    res.json({
+      id: updated!.id,
+      name: updated!.name,
+      email: updated!.email,
+      active: updated!.active,
+      roles: updated!.roles.map((r: any) => r.role.name),
+    });
+  })
+);
+
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("ADMINISTRADOR"),
+  asyncHandler(async (req, res) => {
+    const before = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!before) throw new ApiError(404, "Usuario no encontrado");
+    if (req.user?.id === req.params.id) {
+      throw new ApiError(400, "No puedes eliminar tu propio usuario mientras tienes la sesión iniciada");
+    }
+    try {
+      await prisma.userRole.deleteMany({ where: { userId: req.params.id } });
+      await prisma.user.delete({ where: { id: req.params.id } });
+    } catch {
+      throw new ApiError(
+        409,
+        "Este usuario tiene pedidos, auditoría u otros registros asociados — desactívalo en vez de eliminarlo"
+      );
+    }
+    await logAudit({ userId: req.user?.id, action: "DELETE", module: "User", recordId: req.params.id, oldValue: before });
+    res.status(204).send();
+  })
+);
+
 export default router;

@@ -91,6 +91,138 @@ export async function computeDashboardSummary(referenceDate: Date = new Date()) 
 
 
 /**
+ * NUEVO — "Ahorro para gastos operativos": cuánto necesito generar/ahorrar
+ * por día para cubrir Renta + Nómina + Gastos (los 3 fusionados en una sola
+ * pantalla de administración). Pedido explícito del usuario para separar
+ * este cálculo del objetivo de ahorro/vacaciones (que sigue usando
+ * computeDashboardSummary sin cambios).
+ */
+function weeklyEquivalent(amount: number, periodicity: string): number {
+  switch (periodicity) {
+    case "DIARIO":
+      return amount * 7;
+    case "SEMANAL":
+      return amount;
+    case "MENSUAL":
+      return (amount * 12) / 52;
+    case "ANUAL":
+      return amount / 52;
+    default: // PERSONALIZADO / EXTRAORDINARIO — se cuenta esta semana tal cual
+      return amount;
+  }
+}
+
+export async function computeOperationalDailyNeed(referenceDate: Date = new Date()) {
+  const [activeRents, activeExpenses, employees] = await Promise.all([
+    prisma.rent.findMany({ where: { status: "ACTIVE" } }),
+    prisma.expense.findMany({ where: { status: "ACTIVE" } }),
+    prisma.employee.findMany({ where: { active: true } }),
+  ]);
+
+  const rentaSemanal = activeRents.reduce((sum: number, r: any) => sum + weeklyEquivalent(r.value, r.periodicity), 0);
+  const gastosSemanal = activeExpenses.reduce(
+    (sum: number, e: any) => sum + weeklyEquivalent(e.amount, e.periodicity),
+    0
+  );
+  // Asume una semana laboral de 5 días — la Nómina real (días marcados) se
+  // sigue viendo con detalle en la pantalla combinada Renta/Nómina/Gastos.
+  const nominaSemanal = employees.reduce((sum: number, e: any) => sum + e.dailySalary * 5, 0);
+
+  const pagosSemanales = rentaSemanal + gastosSemanal + nominaSemanal;
+  const ahorroDiarioNecesario = Math.round((pagosSemanales / 7) * 100) / 100;
+
+  void referenceDate; // reservado por si más adelante se prorratea por fecha
+  return {
+    rentaSemanal: Math.round(rentaSemanal * 100) / 100,
+    nominaSemanal: Math.round(nominaSemanal * 100) / 100,
+    gastosSemanal: Math.round(gastosSemanal * 100) / 100,
+    pagosSemanales: Math.round(pagosSemanales * 100) / 100,
+    ahorroDiarioNecesario,
+  };
+}
+
+/**
+ * NUEVO — "Meta de ganancia": el usuario configura cuánto quiere ganar
+ * (Setting finance.profitGoal + fechas), el sistema calcula la ganancia neta
+ * acumulada real (Ventas - Gastos del día, sumadas desde la fecha de inicio)
+ * y cuánto falta ganar por día para llegar a la meta.
+ */
+export async function computeProfitGoal(referenceDate: Date = new Date()) {
+  const settings = await prisma.setting.findMany({
+    where: { key: { in: ["finance.profitGoal", "finance.profitGoalStartDate", "finance.profitGoalEndDate"] } },
+  });
+  const settingValue = (key: string, fallback: string) =>
+    settings.find((s: any) => s.key === key)?.value ?? fallback;
+
+  const profitGoal = Number(settingValue("finance.profitGoal", "0")) || 0;
+  const startDateStr = settingValue("finance.profitGoalStartDate", "");
+  const endDateStr = settingValue("finance.profitGoalEndDate", "");
+  const startDate = startDateStr ? new Date(startDateStr) : new Date(0);
+  const endDate = endDateStr ? new Date(endDateStr) : null;
+
+  const [incomeRows, expenseRows] = await Promise.all([
+    prisma.income.findMany({ where: { date: { gte: startDate, lte: referenceDate } } }),
+    prisma.dailyExpense.findMany({ where: { date: { gte: startDate, lte: referenceDate } } }),
+  ]);
+
+  const totalVentas = incomeRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+  const totalGastos = expenseRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+  const gananciaAcumulada = totalVentas - totalGastos;
+
+  const faltante = Math.max(0, profitGoal - gananciaAcumulada);
+  const progreso = profitGoal > 0 ? Math.min(100, (gananciaAcumulada / profitGoal) * 100) : 0;
+
+  let diasRestantes = 0;
+  let metaVencida = false;
+  if (endDate) {
+    const msRemaining = endDate.getTime() - referenceDate.getTime();
+    diasRestantes = Math.max(0, Math.ceil(msRemaining / DAY_MS));
+    if (msRemaining < 0 && faltante > 0) metaVencida = true;
+  }
+  const gananciaDiariaNecesaria =
+    diasRestantes > 0 ? Math.round((faltante / diasRestantes) * 100) / 100 : faltante > 0 ? faltante : 0;
+
+  return {
+    profitGoal,
+    gananciaAcumulada: Math.round(gananciaAcumulada * 100) / 100,
+    faltante: Math.round(faltante * 100) / 100,
+    progreso: Math.round(progreso * 10) / 10,
+    diasRestantes,
+    metaVencida,
+    gananciaDiariaNecesaria,
+  };
+}
+
+/**
+ * NUEVO — Evolución histórica (sección "que en el dash muestre la evolución,
+ * semanal, mensual y historial"). Devuelve Ventas/Gastos/Ganancia día por
+ * día para los últimos `days` días, tomando los registros manuales
+ * (Income/DailyExpense) — días sin registro cuentan como $0, no se inventan.
+ */
+export async function computeEvolution(days: number, referenceDate: Date = new Date()) {
+  const end = normalizeToDay(referenceDate);
+  const start = new Date(end.getTime() - (days - 1) * DAY_MS);
+
+  const [incomeRows, expenseRows] = await Promise.all([
+    prisma.income.findMany({ where: { date: { gte: start, lte: end } } }),
+    prisma.dailyExpense.findMany({ where: { date: { gte: start, lte: end } } }),
+  ]);
+
+  const incomeByDate = new Map(incomeRows.map((r: any) => [r.date.toISOString().slice(0, 10), r.amount]));
+  const expenseByDate = new Map(expenseRows.map((r: any) => [r.date.toISOString().slice(0, 10), r.amount]));
+
+  const series: { fecha: string; ventas: number; gastos: number; ganancia: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start.getTime() + i * DAY_MS);
+    const key = d.toISOString().slice(0, 10);
+    const ventas = (incomeByDate.get(key) as number) ?? 0;
+    const gastos = (expenseByDate.get(key) as number) ?? 0;
+    series.push({ fecha: key, ventas, gastos, ganancia: ventas - gastos });
+  }
+  return series;
+}
+
+/**
  * BN-004 — Ahorro diario necesario (cálculo central del dashboard, ANTES de
  * la corrección "Dashboard financiero" pedida por el usuario).
  *
