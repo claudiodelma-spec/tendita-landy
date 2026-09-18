@@ -11,6 +11,7 @@
     "typecheck:tests": "tsc --noEmit -p tests/tsconfig.json",
     "seed": "tsx prisma/seed.ts",
     "seed:settings": "tsx prisma/seed-settings.ts",
+    "clear:demo": "tsx prisma/clear-demo-data.ts",
     "test": "vitest run src",
     "pretest:integration": "cross-env DATABASE_URL=file:./prisma-test.db npx prisma db push --schema=../02_database/prisma/schema.prisma --skip-generate --accept-data-loss",
     "test:integration": "cross-env DATABASE_URL=file:./prisma-test.db ENVIRONMENT=SANDBOX vitest run tests/integration --testTimeout=20000"

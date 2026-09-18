@@ -113,33 +113,78 @@ function weeklyEquivalent(amount: number, periodicity: string): number {
 }
 
 export async function computeOperationalDailyNeed(referenceDate: Date = new Date()) {
-  const [activeRents, activeExpenses, employees] = await Promise.all([
+  const day = normalizeToDay(referenceDate);
+  const sevenDaysAgo = new Date(day.getTime() - 6 * DAY_MS);
+
+  const [activeRents, activeExpenses, employees, dailyExpenses] = await Promise.all([
     prisma.rent.findMany({ where: { status: "ACTIVE" } }),
     prisma.expense.findMany({ where: { status: "ACTIVE" } }),
     prisma.employee.findMany({ where: { active: true } }),
+    // "Gastos del día" (Resumen del día) de los últimos 7 días — pedido del
+    // usuario: el ahorro operativo debe sumar tanto los gastos fijos
+    // categorizados como los gastos del día registrados a mano.
+    prisma.dailyExpense.findMany({ where: { date: { gte: sevenDaysAgo, lte: day } } }),
   ]);
 
   const rentaSemanal = activeRents.reduce((sum: number, r: any) => sum + weeklyEquivalent(r.value, r.periodicity), 0);
-  const gastosSemanal = activeExpenses.reduce(
+  const gastosFijosSemanal = activeExpenses.reduce(
     (sum: number, e: any) => sum + weeklyEquivalent(e.amount, e.periodicity),
     0
   );
+  const gastosDiaSemanal = dailyExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
   // Asume una semana laboral de 5 días — la Nómina real (días marcados) se
   // sigue viendo con detalle en la pantalla combinada Renta/Nómina/Gastos.
   const nominaSemanal = employees.reduce((sum: number, e: any) => sum + e.dailySalary * 5, 0);
 
-  const pagosSemanales = rentaSemanal + gastosSemanal + nominaSemanal;
+  const pagosSemanales = rentaSemanal + nominaSemanal + gastosFijosSemanal + gastosDiaSemanal;
   const ahorroDiarioNecesario = Math.round((pagosSemanales / 7) * 100) / 100;
 
-  void referenceDate; // reservado por si más adelante se prorratea por fecha
   return {
     rentaSemanal: Math.round(rentaSemanal * 100) / 100,
     nominaSemanal: Math.round(nominaSemanal * 100) / 100,
-    gastosSemanal: Math.round(gastosSemanal * 100) / 100,
+    gastosFijosSemanal: Math.round(gastosFijosSemanal * 100) / 100,
+    gastosDiaSemanal: Math.round(gastosDiaSemanal * 100) / 100,
     pagosSemanales: Math.round(pagosSemanales * 100) / 100,
     ahorroDiarioNecesario,
   };
 }
+
+/**
+ * NUEVO — "Ahorro para vacaciones": el usuario pidió sacar del Dashboard el
+ * cartón antiguo basado en Settings (Objetivo principal + Fondo vacaciones)
+ * y mostrar en su lugar una regla real basada en los periodos de vacaciones
+ * que administra en la pantalla Vacaciones (VacationPeriod, sin cambios ahí).
+ * Toma el periodo próximo/activo más cercano.
+ */
+export async function computeVacationDashboardCard(referenceDate: Date = new Date()) {
+  const periods = await prisma.vacationPeriod.findMany({ orderBy: { startDate: "asc" } });
+  const upcoming = periods.find((p: any) => new Date(p.startDate).getTime() >= referenceDate.getTime()) ?? periods[0];
+
+  if (!upcoming) {
+    return { hasPeriod: false as const };
+  }
+
+  const daysUntilStart = Math.max(
+    1,
+    Math.ceil((new Date(upcoming.startDate).getTime() - referenceDate.getTime()) / DAY_MS)
+  );
+  const dailyNeed = computeVacationDailySavings(upcoming.targetAmount, upcoming.currentSavings, daysUntilStart);
+  const faltante = Math.max(0, upcoming.targetAmount - upcoming.currentSavings);
+
+  return {
+    hasPeriod: true as const,
+    id: upcoming.id,
+    name: upcoming.name,
+    startDate: upcoming.startDate,
+    endDate: upcoming.endDate,
+    targetAmount: upcoming.targetAmount,
+    currentSavings: upcoming.currentSavings,
+    faltante: Math.round(faltante * 100) / 100,
+    diasRestantes: daysUntilStart,
+    ahorroDiarioNecesario: dailyNeed,
+  };
+}
+
 
 /**
  * NUEVO — "Meta de ganancia": el usuario configura cuánto quiere ganar
