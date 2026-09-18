@@ -83,22 +83,11 @@ export interface DashboardSummary {
   ventasDia: number;
   gastosDia: number;
   gananciaNeta: number;
-  objetivoPrincipal: number;
-  fondoVacaciones: number;
-  objetivoTotal: number;
-  ahorroAcumulado: number;
-  faltaAhorrar: number;
-  progreso: number;
-  ahorroDiarioNecesario: number;
-  diasRestantes: number;
-  objetivoVencido: boolean;
-  ahorroRecomendado: number;
-  disponibleDespues: number;
-  deficit: number;
   gastosOperativos: {
     rentaSemanal: number;
     nominaSemanal: number;
-    gastosSemanal: number;
+    gastosFijosSemanal: number;
+    gastosDiaSemanal: number;
     pagosSemanales: number;
     ahorroDiarioNecesario: number;
   };
@@ -111,6 +100,20 @@ export interface DashboardSummary {
     metaVencida: boolean;
     gananciaDiariaNecesaria: number;
   };
+  vacacionesResumen:
+    | { hasPeriod: false }
+    | {
+        hasPeriod: true;
+        id: string;
+        name: string;
+        startDate: string;
+        endDate: string;
+        targetAmount: number;
+        currentSavings: number;
+        faltante: number;
+        diasRestantes: number;
+        ahorroDiarioNecesario: number;
+      };
 }
 
 export interface EvolutionPoint {

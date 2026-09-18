@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { PiggyBank, AlertTriangle, CheckCircle2, TrendingUp } from "lucide-react";
+import { PiggyBank, TrendingUp, Palmtree } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Card } from "../components/Card";
 import { ProgressBar } from "../components/ProgressBar";
@@ -16,13 +16,13 @@ function todayStr() {
 type EvoRange = "week" | "month" | "history";
 const RANGE_LABELS: Record<EvoRange, string> = { week: "Semanal", month: "Mensual", history: "Histórico (90 días)" };
 
-// Corrección "Dashboard financiero" + ajuste posterior del usuario:
-// - Resumen del día (manual) + Ganancia neta (automática)
-// - Ahorro para gastos operativos (Renta+Nómina+Gastos fusionados — "cuánto
-//   tengo que juntar por día para llegar a todos los gastos")
-// - Meta de ganancia (configurable, progreso automático)
-// - Objetivo de ahorro / Vacaciones (BN-011, sin cambios — cuenta aparte)
-// - Evolución semanal/mensual/histórico
+// Ajuste posterior del usuario sobre la corrección "Dashboard financiero":
+// - Resumen del día + historial de Ventas/Gastos (para ver la evolución)
+// - Ahorro para gastos operativos: Renta + Nómina + Gastos fijos + Gastos
+//   del día (últimos 7 días) — fórmula corregida a pedido explícito
+// - Meta de ganancia (sin cambios)
+// - Ahorro para vacaciones: reemplaza el cartón viejo basado en Settings por
+//   uno que lee el periodo de vacaciones real (pantalla Vacaciones, sin tocar)
 export function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [data, setData] = useState<DashboardSummary | null>(null);
@@ -46,10 +46,11 @@ export function DashboardPage() {
       })
       .catch((e) => setError(e.message ?? "No se pudo cargar el dashboard"));
   }
-  useEffect(() => load(selectedDate), [selectedDate]);
-  useEffect(() => {
+  function loadEvolution() {
     financeService.getEvolution(evoRange).then((r) => setEvolution(r.series));
-  }, [evoRange]);
+  }
+  useEffect(() => load(selectedDate), [selectedDate]);
+  useEffect(loadEvolution, [evoRange]);
 
   async function saveVentas() {
     setSavingMsg(null);
@@ -57,7 +58,7 @@ export function DashboardPage() {
       await financeService.upsertIncome(selectedDate, Number(ventasDraft));
       setSavingMsg("✓ Ventas del día guardadas");
       load(selectedDate);
-      financeService.getEvolution(evoRange).then((r) => setEvolution(r.series));
+      loadEvolution();
     } catch (e: any) {
       setSavingMsg(e.message ?? "No se pudo guardar");
     }
@@ -68,7 +69,7 @@ export function DashboardPage() {
       await financeService.upsertDailyExpense(selectedDate, Number(gastosDraft));
       setSavingMsg("✓ Gastos del día guardados");
       load(selectedDate);
-      financeService.getEvolution(evoRange).then((r) => setEvolution(r.series));
+      loadEvolution();
     } catch (e: any) {
       setSavingMsg(e.message ?? "No se pudo guardar");
     }
@@ -78,6 +79,8 @@ export function DashboardPage() {
     return <Card className="text-sm text-rose-600">{error} — verifica que el backend esté corriendo en <code>VITE_API_URL</code>.</Card>;
   }
   if (!data) return <p className="text-sm text-slate-400">Cargando dashboard…</p>;
+
+  const historyRows = [...evolution].reverse(); // más reciente primero
 
   return (
     <div className="space-y-6">
@@ -112,23 +115,75 @@ export function DashboardPage() {
         {savingMsg && <p className="text-xs text-slate-500">{savingMsg}</p>}
       </Card>
 
-      {/* AHORRO PARA GASTOS OPERATIVOS (Renta + Nómina + Gastos) */}
+      {/* HISTORIAL — evolución día por día */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-slate-700">Evolución de Ventas y Gastos</p>
+          <div className="flex gap-2">
+            {(["week", "month", "history"] as EvoRange[]).map((r) => (
+              <button key={r} onClick={() => setEvoRange(r)} className={`text-xs px-3 py-1 rounded-full font-medium ${evoRange === r ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                {RANGE_LABELS[r]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={evolution}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="fecha" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip formatter={(v: number) => money(v)} labelFormatter={(l) => l} />
+            <Line type="monotone" dataKey="ventas" stroke="#10b981" strokeWidth={2} dot={false} name="Ventas" />
+            <Line type="monotone" dataKey="gastos" stroke="#f43f5e" strokeWidth={2} dot={false} name="Gastos" />
+            <Line type="monotone" dataKey="ganancia" stroke="#3b82f6" strokeWidth={2} dot={false} name="Ganancia" />
+          </LineChart>
+        </ResponsiveContainer>
+
+        <div className="overflow-x-auto mt-4 max-h-64 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="text-left text-slate-500 border-b border-slate-100">
+                <th className="py-2 pr-4 font-medium">Fecha</th>
+                <th className="py-2 pr-4 font-medium">Ventas</th>
+                <th className="py-2 pr-4 font-medium">Gastos</th>
+                <th className="py-2 pr-4 font-medium">Ganancia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyRows.map((row) => (
+                <tr key={row.fecha} className="border-b border-slate-50 last:border-0">
+                  <td className="py-1.5 pr-4 text-slate-600">{row.fecha}</td>
+                  <td className="py-1.5 pr-4 text-emerald-700">{money(row.ventas)}</td>
+                  <td className="py-1.5 pr-4 text-rose-600">{money(row.gastos)}</td>
+                  <td className={`py-1.5 pr-4 font-medium ${row.ganancia >= 0 ? "text-blue-700" : "text-rose-700"}`}>{money(row.ganancia)}</td>
+                </tr>
+              ))}
+              {historyRows.length === 0 && (
+                <tr><td colSpan={4} className="text-center text-slate-400 py-4">Sin registros todavía.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* AHORRO PARA GASTOS OPERATIVOS */}
       <Card className="bg-indigo-50 border-indigo-100">
         <div className="flex items-center gap-2 mb-1">
           <PiggyBank className="h-4 w-4 text-indigo-600" />
           <p className="text-sm font-medium text-indigo-700">Ahorro para gastos operativos</p>
         </div>
-        <p className="text-xs text-indigo-500 mb-3">Cuánto necesitas juntar por día para cubrir Renta + Nómina + Gastos</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-          <div><p className="text-indigo-400">Renta/semana</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.rentaSemanal)}</p></div>
-          <div><p className="text-indigo-400">Nómina/semana</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.nominaSemanal)}</p></div>
-          <div><p className="text-indigo-400">Gastos/semana</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosSemanal)}</p></div>
-          <div><p className="text-indigo-400">Total/semana</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.pagosSemanales)}</p></div>
+        <p className="text-xs text-indigo-500 mb-3">Renta + Nómina + Gastos fijos + Gastos del día (últimos 7 días)</p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs mb-3">
+          <div><p className="text-indigo-400">Renta/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.rentaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Nómina/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.nominaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Gastos fijos/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosFijosSemanal)}</p></div>
+          <div><p className="text-indigo-400">Gastos del día (7d)</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosDiaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Total/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.pagosSemanales)}</p></div>
         </div>
         <p className="text-xl font-bold text-indigo-800">
           {money(data.gastosOperativos.ahorroDiarioNecesario)} <span className="text-xs font-normal text-indigo-400">/ día</span>
         </p>
-        <p className="text-xs text-indigo-400 mt-1">Se edita en Renta, Nómina y Gastos.</p>
+        <p className="text-xs text-indigo-400 mt-1">Renta y Gastos fijos se editan en "Renta, Nómina y Gastos"; Gastos del día arriba en Resumen del día.</p>
       </Card>
 
       {/* META DE GANANCIA */}
@@ -151,71 +206,30 @@ export function DashboardPage() {
         {data.metaGanancia.metaVencida && <p className="text-xs text-rose-600 mt-2">⚠️ La fecha de la meta ya pasó y aún falta {money(data.metaGanancia.faltante)}.</p>}
       </Card>
 
-      {/* Ganancia neta vs. ahorro del objetivo — sección 8 */}
-      <Card className={data.deficit > 0 ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}>
-        <div className="flex items-start gap-3">
-          {data.deficit > 0 ? <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />}
-          <div className="text-sm">
-            {data.deficit > 0 ? (
-              <p className="text-rose-700">Déficit del día (vs. objetivo de ahorro/vacaciones): <b>{money(data.deficit)}</b>. Puedes registrar el ahorro real que consideres posible.</p>
-            ) : (
-              <p className="text-emerald-700">Ahorro recomendado hoy: <b>{money(data.ahorroRecomendado)}</b> — disponible después: <b>{money(data.disponibleDespues)}</b></p>
-            )}
-          </div>
+      {/* AHORRO PARA VACACIONES */}
+      <Card className="bg-sky-50 border-sky-100">
+        <div className="flex items-center gap-2 mb-1">
+          <Palmtree className="h-4 w-4 text-sky-600" />
+          <p className="text-sm font-medium text-sky-700">Ahorro para vacaciones</p>
         </div>
-      </Card>
-
-      {/* OBJETIVO DE AHORRO / VACACIONES */}
-      <Card>
-        <p className="text-sm font-medium text-slate-700 mb-1">Objetivo de ahorro y vacaciones</p>
-        <p className="text-xs text-slate-400 mb-4">Cuenta aparte del ahorro operativo de arriba</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
-          <div><p className="text-xs text-slate-500">Objetivo principal</p><p className="font-medium text-slate-800">{money(data.objetivoPrincipal)}</p></div>
-          <div><p className="text-xs text-slate-500">Fondo vacaciones</p><p className="font-medium text-slate-800">{money(data.fondoVacaciones)}</p></div>
-          <div><p className="text-xs text-slate-500">Objetivo total</p><p className="font-semibold text-slate-900">{money(data.objetivoTotal)}</p></div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3 text-sm">
-          <div><p className="text-xs text-slate-500">Ahorro acumulado</p><p className="font-medium text-emerald-700">{money(data.ahorroAcumulado)}</p></div>
-          <div><p className="text-xs text-slate-500">Falta ahorrar</p><p className="font-medium text-slate-800">{money(data.faltaAhorrar)}</p></div>
-        </div>
-        <div className="mb-4">
-          <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Progreso</span><span>{data.progreso}%</span></div>
-          <ProgressBar percent={data.progreso} />
-        </div>
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <PiggyBank className="h-4 w-4 text-blue-600" />
-          <p className="text-sm text-slate-600">
-            Ahorro diario necesario: <span className="font-semibold text-blue-700">{money(data.ahorroDiarioNecesario)}</span>
-            {data.diasRestantes > 0 && <span className="text-xs text-slate-400"> · {data.diasRestantes} días restantes</span>}
-          </p>
-        </div>
-        {data.objetivoVencido && <p className="text-xs text-rose-600 mt-2">⚠️ Objetivo vencido — todavía falta {money(data.faltaAhorrar)}.</p>}
-        <p className="text-xs text-slate-400 mt-3">Se edita en Configuración.</p>
-      </Card>
-
-      {/* EVOLUCIÓN */}
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-slate-700">Evolución</p>
-          <div className="flex gap-2">
-            {(["week", "month", "history"] as EvoRange[]).map((r) => (
-              <button key={r} onClick={() => setEvoRange(r)} className={`text-xs px-3 py-1 rounded-full font-medium ${evoRange === r ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}`}>
-                {RANGE_LABELS[r]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={evolution}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="fecha" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-            <YAxis tick={{ fontSize: 10 }} />
-            <Tooltip formatter={(v: number) => money(v)} labelFormatter={(l) => l} />
-            <Line type="monotone" dataKey="ventas" stroke="#10b981" strokeWidth={2} dot={false} name="Ventas" />
-            <Line type="monotone" dataKey="gastos" stroke="#f43f5e" strokeWidth={2} dot={false} name="Gastos" />
-            <Line type="monotone" dataKey="ganancia" stroke="#3b82f6" strokeWidth={2} dot={false} name="Ganancia" />
-          </LineChart>
-        </ResponsiveContainer>
+        {data.vacacionesResumen.hasPeriod ? (
+          <>
+            <p className="text-xs text-sky-500 mb-3">
+              Próximo periodo: <b>{data.vacacionesResumen.name}</b> · {new Date(data.vacacionesResumen.startDate).toLocaleDateString("es-MX")} — {new Date(data.vacacionesResumen.endDate).toLocaleDateString("es-MX")}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mb-1">
+              <div><p className="text-xs text-sky-500">Objetivo</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.targetAmount)}</p></div>
+              <div><p className="text-xs text-sky-500">Ahorrado</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.currentSavings)}</p></div>
+              <div><p className="text-xs text-sky-500">Falta</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.faltante)}</p></div>
+            </div>
+            <p className="text-xl font-bold text-sky-800 mt-2">
+              {money(data.vacacionesResumen.ahorroDiarioNecesario)} <span className="text-xs font-normal text-sky-400">/ día durante {data.vacacionesResumen.diasRestantes} días</span>
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-sky-600">Aún no hay periodos de vacaciones configurados.</p>
+        )}
+        <p className="text-xs text-sky-400 mt-2">Se administra en la pantalla Vacaciones.</p>
       </Card>
     </div>
   );

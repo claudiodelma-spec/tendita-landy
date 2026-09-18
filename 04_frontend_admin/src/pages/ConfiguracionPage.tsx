@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Card } from "../components/Card";
+import { ImageUploadInput } from "../components/ImageUploadInput";
 import { settingsService } from "../services/settingsService";
 import { driveService } from "../services/driveService";
 import type { Setting, SettingCategory } from "../types/settings";
@@ -14,20 +15,23 @@ const CATEGORY_LABELS: Record<SettingCategory, string> = {
 
 const KEY_LABELS: Record<string, string> = {
   "business.name": "Nombre del negocio",
-  "business.logo": "Logo (URL)",
+  "business.logo": "Logo",
   "whatsapp.number": "Número de WhatsApp (formato: 521XXXXXXXXXX)",
   "finance.currency": "Moneda",
   "system.timezone": "Zona horaria",
   "system.environment": "Entorno",
   "carousel.maxImages": "Máximo de imágenes activas",
-  "savings.mainGoal": "Objetivo principal de ahorro ($)",
-  "savings.vacationFund": "Fondo de vacaciones ($)",
-  "savings.targetStartDate": "Fecha inicial del objetivo (AAAA-MM-DD)",
-  "savings.targetEndDate": "Fecha final del objetivo (AAAA-MM-DD)",
   "finance.profitGoal": "Meta de ganancia ($)",
   "finance.profitGoalStartDate": "Fecha inicial de la meta de ganancia (AAAA-MM-DD)",
   "finance.profitGoalEndDate": "Fecha final de la meta de ganancia (AAAA-MM-DD)",
 };
+
+// Ajuste posterior: el "Objetivo de ahorro/vacaciones" basado en Settings se
+// reemplazó en el Dashboard por uno que lee los periodos reales de
+// Vacaciones — estas 4 claves ya no se usan en ningún lado. No se borran de
+// la base de datos (nada se pierde), solo se ocultan de esta pantalla para
+// no confundir.
+const HIDDEN_KEYS = new Set(["savings.mainGoal", "savings.vacationFund", "savings.targetStartDate", "savings.targetEndDate"]);
 
 // Section 33 — Configuración: todo valor editable desde aquí, nunca fijo en el código.
 export function ConfiguracionPage() {
@@ -61,17 +65,20 @@ export function ConfiguracionPage() {
     }
   }
 
-  async function save(setting: Setting) {
-    await settingsService.update(setting.id, drafts[setting.id]);
+  async function save(setting: Setting, value?: string) {
+    const finalValue = value ?? drafts[setting.id];
+    await settingsService.update(setting.id, finalValue);
     setSavedKey(setting.id);
     setTimeout(() => setSavedKey((k) => (k === setting.id ? null : k)), 1500);
     load();
   }
 
-  const grouped = settings.reduce<Record<string, Setting[]>>((acc, s) => {
-    (acc[s.category] ??= []).push(s);
-    return acc;
-  }, {});
+  const grouped = settings
+    .filter((s) => !HIDDEN_KEYS.has(s.key))
+    .reduce<Record<string, Setting[]>>((acc, s) => {
+      (acc[s.category] ??= []).push(s);
+      return acc;
+    }, {});
 
   const isReadOnlyEnvironment = (key: string) => key === "system.environment";
 
@@ -85,26 +92,37 @@ export function ConfiguracionPage() {
         return (
           <Card key={cat}>
             <p className="text-sm font-medium text-slate-700 mb-3">{CATEGORY_LABELS[cat]}</p>
-            <div className="space-y-3">
-              {items.map((s) => (
-                <div key={s.id} className="flex items-center gap-3">
-                  <label className="text-xs text-slate-500 w-64 shrink-0">{KEY_LABELS[s.key] ?? s.key}</label>
-                  <input
-                    disabled={isReadOnlyEnvironment(s.key)}
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-                    value={drafts[s.id] ?? ""}
-                    onChange={(e) => setDrafts({ ...drafts, [s.id]: e.target.value })}
-                  />
-                  {!isReadOnlyEnvironment(s.key) && (
-                    <button
-                      onClick={() => save(s)}
-                      className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 shrink-0"
-                    >
-                      {savedKey === s.id ? "✓ Guardado" : "Guardar"}
-                    </button>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-4">
+              {items.map((s) =>
+                s.key === "business.logo" ? (
+                  <div key={s.id}>
+                    <label className="block text-xs text-slate-500 mb-1">{KEY_LABELS[s.key]}</label>
+                    <ImageUploadInput
+                      value={drafts[s.id] ?? ""}
+                      onChange={(v) => {
+                        setDrafts({ ...drafts, [s.id]: v });
+                        save(s, v);
+                      }}
+                      label=""
+                    />
+                  </div>
+                ) : (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <label className="text-xs text-slate-500 w-64 shrink-0">{KEY_LABELS[s.key] ?? s.key}</label>
+                    <input
+                      disabled={isReadOnlyEnvironment(s.key)}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                      value={drafts[s.id] ?? ""}
+                      onChange={(e) => setDrafts({ ...drafts, [s.id]: e.target.value })}
+                    />
+                    {!isReadOnlyEnvironment(s.key) && (
+                      <button onClick={() => save(s)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 shrink-0">
+                        {savedKey === s.id ? "✓ Guardado" : "Guardar"}
+                      </button>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           </Card>
         );
@@ -119,31 +137,18 @@ export function ConfiguracionPage() {
         <p className="text-sm font-medium text-slate-700 mb-3">Google Drive y Backups (sección 35/37)</p>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs text-slate-500">Modo actual:</span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              driveMode === "MOCK" ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"
-            }`}
-          >
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${driveMode === "MOCK" ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
             {driveMode ?? "…"}
           </span>
-          {driveMode === "MOCK" && (
-            <span className="text-xs text-slate-400">
-              — las imágenes/backups no se suben a Drive real todavía
-            </span>
-          )}
+          {driveMode === "MOCK" && <span className="text-xs text-slate-400">— las imágenes/backups no se suben a Drive real todavía</span>}
         </div>
-        <button
-          onClick={runBackup}
-          disabled={backingUp}
-          className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
-        >
+        <button onClick={runBackup} disabled={backingUp} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60">
           {backingUp ? "Generando backup…" : "Generar backup local ahora"}
         </button>
         {backupResult && (
           <p className="text-xs text-emerald-600 mt-2">
-            ✓ Backup generado el {new Date(backupResult.timestamp).toLocaleString("es-MX")} — guardado en el
-            servidor ({backupResult.path.includes("MOCK") ? "modo mock, no subido a Drive real" : "subido a Drive"}
-            ).
+            ✓ Backup generado el {new Date(backupResult.timestamp).toLocaleString("es-MX")} — guardado en el servidor (
+            {backupResult.path.includes("MOCK") ? "modo mock, no subido a Drive real" : "subido a Drive"}).
           </p>
         )}
         {backupError && <p className="text-xs text-rose-600 mt-2">{backupError}</p>}
