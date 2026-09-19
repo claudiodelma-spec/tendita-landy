@@ -7,7 +7,6 @@ import {
   computeOperationalDailyNeed,
   computeProfitGoal,
   computeEvolution,
-  computeVacationDashboardCard,
 } from "../services/financeCalculations.js";
 
 const router = Router();
@@ -24,13 +23,12 @@ router.get(
   requireRole("ADMINISTRADOR", "GESTION"),
   asyncHandler(async (req, res) => {
     const date = req.query.date ? new Date(String(req.query.date)) : new Date();
-    const [summary, gastosOperativos, metaGanancia, vacacionesResumen] = await Promise.all([
+    const [summary, gastosOperativos, metaGanancia] = await Promise.all([
       computeDashboardSummary(date),
       computeOperationalDailyNeed(date),
       computeProfitGoal(date),
-      computeVacationDashboardCard(date),
     ]);
-    res.json({ ...summary, gastosOperativos, metaGanancia, vacacionesResumen });
+    res.json({ ...summary, gastosOperativos, metaGanancia });
   })
 );
 

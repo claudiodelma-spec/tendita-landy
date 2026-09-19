@@ -253,16 +253,32 @@ export async function computeEvolution(days: number, referenceDate: Date = new D
     prisma.dailyExpense.findMany({ where: { date: { gte: start, lte: end } } }),
   ]);
 
-  const incomeByDate = new Map(incomeRows.map((r: any) => [r.date.toISOString().slice(0, 10), r.amount]));
-  const expenseByDate = new Map(expenseRows.map((r: any) => [r.date.toISOString().slice(0, 10), r.amount]));
+  const incomeByDate = new Map(incomeRows.map((r: any) => [r.date.toISOString().slice(0, 10), r]));
+  const expenseByDate = new Map(expenseRows.map((r: any) => [r.date.toISOString().slice(0, 10), r]));
 
-  const series: { fecha: string; ventas: number; gastos: number; ganancia: number }[] = [];
+  const series: {
+    fecha: string;
+    ventas: number;
+    gastos: number;
+    ganancia: number;
+    incomeId: string | null;
+    dailyExpenseId: string | null;
+  }[] = [];
   for (let i = 0; i < days; i++) {
     const d = new Date(start.getTime() + i * DAY_MS);
     const key = d.toISOString().slice(0, 10);
-    const ventas = (incomeByDate.get(key) as number) ?? 0;
-    const gastos = (expenseByDate.get(key) as number) ?? 0;
-    series.push({ fecha: key, ventas, gastos, ganancia: ventas - gastos });
+    const incomeRow = incomeByDate.get(key) as any;
+    const expenseRow = expenseByDate.get(key) as any;
+    const ventas = incomeRow?.amount ?? 0;
+    const gastos = expenseRow?.amount ?? 0;
+    series.push({
+      fecha: key,
+      ventas,
+      gastos,
+      ganancia: ventas - gastos,
+      incomeId: incomeRow?.id ?? null,
+      dailyExpenseId: expenseRow?.id ?? null,
+    });
   }
   return series;
 }

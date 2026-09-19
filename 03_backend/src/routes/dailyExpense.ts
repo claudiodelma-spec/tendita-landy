@@ -70,4 +70,17 @@ router.post(
   })
 );
 
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("ADMINISTRADOR", "GESTION"),
+  asyncHandler(async (req, res) => {
+    const before = await prisma.dailyExpense.findUnique({ where: { id: req.params.id } });
+    if (!before) return res.status(404).json({ error: "Registro no encontrado" });
+    await prisma.dailyExpense.delete({ where: { id: req.params.id } });
+    await logAudit({ userId: req.user?.id, action: "DELETE", module: "DailyExpense", recordId: req.params.id, oldValue: before });
+    res.status(204).send();
+  })
+);
+
 export default router;
