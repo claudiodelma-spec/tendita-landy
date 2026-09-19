@@ -36,8 +36,8 @@ export function HomePage() {
   return (
     <div className="space-y-4">
       <div className="px-5 pt-1">
-        <p className="text-xl font-bold text-slate-900">¡Hola! 👋</p>
-        <p className="text-sm text-slate-400">¿Qué quieres pedir hoy?</p>
+        <p className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-orange-500">¡Hola! 👋</p>
+        <p className="text-sm text-fuchsia-400 font-medium">¿Qué quieres pedir hoy?</p>
       </div>
 
       <CarouselWidget images={images} />

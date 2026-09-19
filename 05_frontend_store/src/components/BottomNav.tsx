@@ -22,8 +22,8 @@ export function BottomNav() {
             to={item.to}
             end={item.to === "/"}
             className={({ isActive }) =>
-              `relative flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl text-xs transition-colors ${
-                isActive ? "text-pink-600" : "text-slate-400"
+              `relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                isActive ? "text-pink-600 bg-pink-50" : "text-slate-400"
               }`
             }
           >
