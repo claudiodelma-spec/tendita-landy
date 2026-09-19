@@ -5,13 +5,10 @@ import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GestionOperativaPage } from "./pages/GestionOperativaPage";
-import { MetasAhorroPage } from "./pages/MetasAhorroPage";
-import { VacacionesPage } from "./pages/VacacionesPage";
 import { ProductosPage } from "./pages/ProductosPage";
 import { CategoriasPage } from "./pages/CategoriasPage";
 import { MenuPage } from "./pages/MenuPage";
 import { CarruselPage } from "./pages/CarruselPage";
-import { PedidosPage } from "./pages/PedidosPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
@@ -37,13 +34,10 @@ function AppRoutes() {
       >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/gestion-operativa" element={<GestionOperativaPage />} />
-        <Route path="/metas-ahorro" element={<MetasAhorroPage />} />
-        <Route path="/vacaciones" element={<VacacionesPage />} />
         <Route path="/productos" element={<ProductosPage />} />
         <Route path="/categorias" element={<CategoriasPage />} />
         <Route path="/menu" element={<MenuPage />} />
         <Route path="/carrusel" element={<CarruselPage />} />
-        <Route path="/pedidos" element={<PedidosPage />} />
         <Route path="/configuracion" element={<ConfiguracionPage />} />
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/usuarios" element={<UsuariosPage />} />

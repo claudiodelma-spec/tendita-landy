@@ -42,8 +42,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Gestión Financiera",
     items: [
       { to: "/gestion-operativa", label: "Renta, Nómina y Gastos", icon: Building2, permission: "finance.view" },
-      { to: "/metas-ahorro", label: "Metas y Ahorro", icon: Target, permission: "finance.view" },
-      { to: "/vacaciones", label: "Vacaciones", icon: Palmtree, permission: "finance.view" },
     ],
   },
   {
@@ -53,7 +51,6 @@ const NAV_SECTIONS: NavSection[] = [
       { to: "/categorias", label: "Categorías", icon: Tag, permission: "store.view" },
       { to: "/menu", label: "Menú Diario", icon: UtensilsCrossed, permission: "store.view" },
       { to: "/carrusel", label: "Carrusel", icon: Images, permission: "store.view" },
-      { to: "/pedidos", label: "Pedidos (WhatsApp)", icon: FileText, permission: "orders.view" },
     ],
   },
   {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { PiggyBank, TrendingUp, Palmtree } from "lucide-react";
+import { PiggyBank, TrendingUp, Pencil, Trash2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Card } from "../components/Card";
 import { ProgressBar } from "../components/ProgressBar";
@@ -12,17 +12,19 @@ function money(n: number) {
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
+function confirmDelete(label: string) {
+  return window.confirm(`¿Eliminar "${label}"? Esta acción no se puede deshacer.`);
+}
 
 type EvoRange = "week" | "month" | "history";
 const RANGE_LABELS: Record<EvoRange, string> = { week: "Semanal", month: "Mensual", history: "Histórico (90 días)" };
 
-// Ajuste posterior del usuario sobre la corrección "Dashboard financiero":
-// - Resumen del día + historial de Ventas/Gastos (para ver la evolución)
-// - Ahorro para gastos operativos: Renta + Nómina + Gastos fijos + Gastos
-//   del día (últimos 7 días) — fórmula corregida a pedido explícito
-// - Meta de ganancia (sin cambios)
-// - Ahorro para vacaciones: reemplaza el cartón viejo basado en Settings por
-//   uno que lee el periodo de vacaciones real (pantalla Vacaciones, sin tocar)
+// Ajustes posteriores del usuario:
+// - Ahorro para gastos operativos subido arriba del todo (es el que más usa)
+// - Historial con editar/eliminar por fila
+// - Quitado el cartón de Vacaciones (y las pantallas Metas y Ahorro /
+//   Vacaciones / Pedidos del menú) — el backend queda intacto por si se
+//   necesitan de nuevo más adelante.
 export function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [data, setData] = useState<DashboardSummary | null>(null);
@@ -75,6 +77,19 @@ export function DashboardPage() {
     }
   }
 
+  function editRow(row: EvolutionPoint) {
+    setSelectedDate(row.fecha);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function deleteRow(row: EvolutionPoint) {
+    if (!confirmDelete(`registro del ${row.fecha}`)) return;
+    if (row.incomeId) await financeService.deleteIncome(row.incomeId);
+    if (row.dailyExpenseId) await financeService.deleteDailyExpense(row.dailyExpenseId);
+    loadEvolution();
+    if (row.fecha === selectedDate) load(selectedDate);
+  }
+
   if (error) {
     return <Card className="text-sm text-rose-600">{error} — verifica que el backend esté corriendo en <code>VITE_API_URL</code>.</Card>;
   }
@@ -115,7 +130,27 @@ export function DashboardPage() {
         {savingMsg && <p className="text-xs text-slate-500">{savingMsg}</p>}
       </Card>
 
-      {/* HISTORIAL — evolución día por día */}
+      {/* AHORRO PARA GASTOS OPERATIVOS — el que más se usa, va arriba */}
+      <Card className="bg-indigo-50 border-indigo-100">
+        <div className="flex items-center gap-2 mb-1">
+          <PiggyBank className="h-4 w-4 text-indigo-600" />
+          <p className="text-sm font-medium text-indigo-700">Ahorro para gastos operativos</p>
+        </div>
+        <p className="text-xs text-indigo-500 mb-3">Renta + Nómina + Gastos fijos + Gastos del día (últimos 7 días)</p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs mb-3">
+          <div><p className="text-indigo-400">Renta/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.rentaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Nómina/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.nominaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Gastos fijos/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosFijosSemanal)}</p></div>
+          <div><p className="text-indigo-400">Gastos del día (7d)</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosDiaSemanal)}</p></div>
+          <div><p className="text-indigo-400">Total/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.pagosSemanales)}</p></div>
+        </div>
+        <p className="text-xl font-bold text-indigo-800">
+          {money(data.gastosOperativos.ahorroDiarioNecesario)} <span className="text-xs font-normal text-indigo-400">/ día</span>
+        </p>
+        <p className="text-xs text-indigo-400 mt-1">Renta y Gastos fijos se editan en "Renta, Nómina y Gastos"; Gastos del día arriba en Resumen del día.</p>
+      </Card>
+
+      {/* HISTORIAL — evolución día por día, con editar/eliminar */}
       <Card>
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium text-slate-700">Evolución de Ventas y Gastos</p>
@@ -139,7 +174,7 @@ export function DashboardPage() {
           </LineChart>
         </ResponsiveContainer>
 
-        <div className="overflow-x-auto mt-4 max-h-64 overflow-y-auto">
+        <div className="overflow-x-auto mt-4 max-h-72 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="text-left text-slate-500 border-b border-slate-100">
@@ -147,6 +182,7 @@ export function DashboardPage() {
                 <th className="py-2 pr-4 font-medium">Ventas</th>
                 <th className="py-2 pr-4 font-medium">Gastos</th>
                 <th className="py-2 pr-4 font-medium">Ganancia</th>
+                <th className="py-2 pr-4 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -156,34 +192,26 @@ export function DashboardPage() {
                   <td className="py-1.5 pr-4 text-emerald-700">{money(row.ventas)}</td>
                   <td className="py-1.5 pr-4 text-rose-600">{money(row.gastos)}</td>
                   <td className={`py-1.5 pr-4 font-medium ${row.ganancia >= 0 ? "text-blue-700" : "text-rose-700"}`}>{money(row.ganancia)}</td>
+                  <td className="py-1.5 pr-4">
+                    {(row.incomeId || row.dailyExpenseId) && (
+                      <div className="flex gap-1">
+                        <button onClick={() => editRow(row)} title="Editar" className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => deleteRow(row)} title="Eliminar" className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-rose-500">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {historyRows.length === 0 && (
-                <tr><td colSpan={4} className="text-center text-slate-400 py-4">Sin registros todavía.</td></tr>
+                <tr><td colSpan={5} className="text-center text-slate-400 py-4">Sin registros todavía.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </Card>
-
-      {/* AHORRO PARA GASTOS OPERATIVOS */}
-      <Card className="bg-indigo-50 border-indigo-100">
-        <div className="flex items-center gap-2 mb-1">
-          <PiggyBank className="h-4 w-4 text-indigo-600" />
-          <p className="text-sm font-medium text-indigo-700">Ahorro para gastos operativos</p>
-        </div>
-        <p className="text-xs text-indigo-500 mb-3">Renta + Nómina + Gastos fijos + Gastos del día (últimos 7 días)</p>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs mb-3">
-          <div><p className="text-indigo-400">Renta/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.rentaSemanal)}</p></div>
-          <div><p className="text-indigo-400">Nómina/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.nominaSemanal)}</p></div>
-          <div><p className="text-indigo-400">Gastos fijos/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosFijosSemanal)}</p></div>
-          <div><p className="text-indigo-400">Gastos del día (7d)</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.gastosDiaSemanal)}</p></div>
-          <div><p className="text-indigo-400">Total/sem</p><p className="font-semibold text-indigo-800">{money(data.gastosOperativos.pagosSemanales)}</p></div>
-        </div>
-        <p className="text-xl font-bold text-indigo-800">
-          {money(data.gastosOperativos.ahorroDiarioNecesario)} <span className="text-xs font-normal text-indigo-400">/ día</span>
-        </p>
-        <p className="text-xs text-indigo-400 mt-1">Renta y Gastos fijos se editan en "Renta, Nómina y Gastos"; Gastos del día arriba en Resumen del día.</p>
       </Card>
 
       {/* META DE GANANCIA */}
@@ -204,32 +232,6 @@ export function DashboardPage() {
           <span>Necesitas ganar {money(data.metaGanancia.gananciaDiariaNecesaria)}/día</span>
         </div>
         {data.metaGanancia.metaVencida && <p className="text-xs text-rose-600 mt-2">⚠️ La fecha de la meta ya pasó y aún falta {money(data.metaGanancia.faltante)}.</p>}
-      </Card>
-
-      {/* AHORRO PARA VACACIONES */}
-      <Card className="bg-sky-50 border-sky-100">
-        <div className="flex items-center gap-2 mb-1">
-          <Palmtree className="h-4 w-4 text-sky-600" />
-          <p className="text-sm font-medium text-sky-700">Ahorro para vacaciones</p>
-        </div>
-        {data.vacacionesResumen.hasPeriod ? (
-          <>
-            <p className="text-xs text-sky-500 mb-3">
-              Próximo periodo: <b>{data.vacacionesResumen.name}</b> · {new Date(data.vacacionesResumen.startDate).toLocaleDateString("es-MX")} — {new Date(data.vacacionesResumen.endDate).toLocaleDateString("es-MX")}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mb-1">
-              <div><p className="text-xs text-sky-500">Objetivo</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.targetAmount)}</p></div>
-              <div><p className="text-xs text-sky-500">Ahorrado</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.currentSavings)}</p></div>
-              <div><p className="text-xs text-sky-500">Falta</p><p className="font-semibold text-sky-800">{money(data.vacacionesResumen.faltante)}</p></div>
-            </div>
-            <p className="text-xl font-bold text-sky-800 mt-2">
-              {money(data.vacacionesResumen.ahorroDiarioNecesario)} <span className="text-xs font-normal text-sky-400">/ día durante {data.vacacionesResumen.diasRestantes} días</span>
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-sky-600">Aún no hay periodos de vacaciones configurados.</p>
-        )}
-        <p className="text-xs text-sky-400 mt-2">Se administra en la pantalla Vacaciones.</p>
       </Card>
     </div>
   );

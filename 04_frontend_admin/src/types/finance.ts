@@ -100,20 +100,6 @@ export interface DashboardSummary {
     metaVencida: boolean;
     gananciaDiariaNecesaria: number;
   };
-  vacacionesResumen:
-    | { hasPeriod: false }
-    | {
-        hasPeriod: true;
-        id: string;
-        name: string;
-        startDate: string;
-        endDate: string;
-        targetAmount: number;
-        currentSavings: number;
-        faltante: number;
-        diasRestantes: number;
-        ahorroDiarioNecesario: number;
-      };
 }
 
 export interface EvolutionPoint {
@@ -121,4 +107,6 @@ export interface EvolutionPoint {
   ventas: number;
   gastos: number;
   ganancia: number;
+  incomeId: string | null;
+  dailyExpenseId: string | null;
 }

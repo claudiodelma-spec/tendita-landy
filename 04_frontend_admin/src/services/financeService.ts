@@ -27,6 +27,8 @@ export const financeService = {
     api.get<{ id: string; amount: number; notes?: string } | null>(`/daily-expenses?date=${date}`),
   upsertDailyExpense: (date: string, amount: number, notes?: string) =>
     api.post<any>("/daily-expenses", { date, amount, notes }),
+  deleteIncome: (id: string) => api.del<void>(`/income/${id}`),
+  deleteDailyExpense: (id: string) => api.del<void>(`/daily-expenses/${id}`),
 
   // Renta (BN-001)
   listRents: () => api.get<Rent[]>("/rent"),
