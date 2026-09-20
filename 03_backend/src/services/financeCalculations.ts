@@ -97,10 +97,14 @@ export async function computeDashboardSummary(referenceDate: Date = new Date()) 
  * este cálculo del objetivo de ahorro/vacaciones (que sigue usando
  * computeDashboardSummary sin cambios).
  */
+// Semana laboral de 5 días (lunes a viernes) — la escuela no opera fin de
+// semana, así que el reparto diario debe hacerse entre 5 días, no 7.
+const WORK_DAYS_PER_WEEK = 5;
+
 function weeklyEquivalent(amount: number, periodicity: string): number {
   switch (periodicity) {
     case "DIARIO":
-      return amount * 7;
+      return amount * WORK_DAYS_PER_WEEK;
     case "SEMANAL":
       return amount;
     case "MENSUAL":
@@ -114,16 +118,14 @@ function weeklyEquivalent(amount: number, periodicity: string): number {
 
 export async function computeOperationalDailyNeed(referenceDate: Date = new Date()) {
   const day = normalizeToDay(referenceDate);
-  const sevenDaysAgo = new Date(day.getTime() - 6 * DAY_MS);
+  const fiveDaysAgo = new Date(day.getTime() - (WORK_DAYS_PER_WEEK - 1) * DAY_MS);
 
   const [activeRents, activeExpenses, employees, dailyExpenses] = await Promise.all([
     prisma.rent.findMany({ where: { status: "ACTIVE" } }),
     prisma.expense.findMany({ where: { status: "ACTIVE" } }),
     prisma.employee.findMany({ where: { active: true } }),
-    // "Gastos del día" (Resumen del día) de los últimos 7 días — pedido del
-    // usuario: el ahorro operativo debe sumar tanto los gastos fijos
-    // categorizados como los gastos del día registrados a mano.
-    prisma.dailyExpense.findMany({ where: { date: { gte: sevenDaysAgo, lte: day } } }),
+    // "Gastos del día" (Resumen del día) de los últimos 5 días laborales.
+    prisma.dailyExpense.findMany({ where: { date: { gte: fiveDaysAgo, lte: day } } }),
   ]);
 
   const rentaSemanal = activeRents.reduce((sum: number, r: any) => sum + weeklyEquivalent(r.value, r.periodicity), 0);
@@ -132,15 +134,15 @@ export async function computeOperationalDailyNeed(referenceDate: Date = new Date
     0
   );
   const gastosDiaSemanal = dailyExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
-  // Asume una semana laboral de 5 días — la Nómina real (días marcados) se
-  // sigue viendo con detalle en la pantalla combinada Renta/Nómina/Gastos.
-  const nominaSemanal = employees.reduce((sum: number, e: any) => sum + e.dailySalary * 5, 0);
+  const nominaSemanal = employees.reduce((sum: number, e: any) => sum + e.dailySalary * WORK_DAYS_PER_WEEK, 0);
 
   const pagosSemanales = rentaSemanal + nominaSemanal + gastosFijosSemanal + gastosDiaSemanal;
-  const ahorroDiarioNecesario = Math.round((pagosSemanales / 7) * 100) / 100;
+  const ahorroDiarioNecesario = Math.round((pagosSemanales / WORK_DAYS_PER_WEEK) * 100) / 100;
+  const rentaDiaria = Math.round((rentaSemanal / WORK_DAYS_PER_WEEK) * 100) / 100;
 
   return {
     rentaSemanal: Math.round(rentaSemanal * 100) / 100,
+    rentaDiaria,
     nominaSemanal: Math.round(nominaSemanal * 100) / 100,
     gastosFijosSemanal: Math.round(gastosFijosSemanal * 100) / 100,
     gastosDiaSemanal: Math.round(gastosDiaSemanal * 100) / 100,
@@ -281,6 +283,55 @@ export async function computeEvolution(days: number, referenceDate: Date = new D
     });
   }
   return series;
+}
+
+/**
+ * NUEVO — "Corte semanal": tablero pedido por el usuario para ver, semana a
+ * semana, Ventas/Gastos/Ganancia reales — y comparar contra la Meta de
+ * ganancia y el Ahorro operativo actuales (sección "cuánto tengo que juntar
+ * por día para llegar a mis metas").
+ */
+export async function computeWeeklySummary(weeksCount: number = 8, referenceDate: Date = new Date()) {
+  const today = normalizeToDay(referenceDate);
+  // Lunes de la semana actual.
+  const dayOfWeek = today.getDay();
+  const diffToMonday = (dayOfWeek + 6) % 7;
+  const currentMonday = new Date(today.getTime() - diffToMonday * DAY_MS);
+
+  const rangeStart = new Date(currentMonday.getTime() - (weeksCount - 1) * 7 * DAY_MS);
+
+  const [incomeRows, expenseRows] = await Promise.all([
+    prisma.income.findMany({ where: { date: { gte: rangeStart, lte: today } } }),
+    prisma.dailyExpense.findMany({ where: { date: { gte: rangeStart, lte: today } } }),
+  ]);
+
+  const weeks: {
+    weekStart: string;
+    weekEnd: string;
+    ventas: number;
+    gastos: number;
+    ganancia: number;
+  }[] = [];
+
+  for (let w = 0; w < weeksCount; w++) {
+    const weekStart = new Date(rangeStart.getTime() + w * 7 * DAY_MS);
+    const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
+    const ventas = incomeRows
+      .filter((r: any) => r.date >= weekStart && r.date <= weekEnd)
+      .reduce((sum: number, r: any) => sum + r.amount, 0);
+    const gastos = expenseRows
+      .filter((r: any) => r.date >= weekStart && r.date <= weekEnd)
+      .reduce((sum: number, r: any) => sum + r.amount, 0);
+    weeks.push({
+      weekStart: weekStart.toISOString().slice(0, 10),
+      weekEnd: weekEnd.toISOString().slice(0, 10),
+      ventas: Math.round(ventas * 100) / 100,
+      gastos: Math.round(gastos * 100) / 100,
+      ganancia: Math.round((ventas - gastos) * 100) / 100,
+    });
+  }
+
+  return weeks;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   computeOperationalDailyNeed,
   computeProfitGoal,
   computeEvolution,
+  computeWeeklySummary,
 } from "../services/financeCalculations.js";
 
 const router = Router();
@@ -42,6 +43,18 @@ router.get(
     const days = range === "month" ? 30 : range === "history" ? 90 : 7;
     const series = await computeEvolution(days);
     res.json({ range, series });
+  })
+);
+
+// Corte semanal — tablero de Ventas/Gastos/Ganancia por semana.
+router.get(
+  "/weekly-summary",
+  requireAuth,
+  requireRole("ADMINISTRADOR", "GESTION"),
+  asyncHandler(async (req, res) => {
+    const weeksCount = req.query.weeks ? Number(req.query.weeks) : 8;
+    const weeks = await computeWeeklySummary(weeksCount);
+    res.json({ weeks });
   })
 );
 
