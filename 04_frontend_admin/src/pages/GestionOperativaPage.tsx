@@ -27,6 +27,16 @@ function confirmDelete(label: string) {
   return window.confirm(`¿Eliminar "${label}"? Esta acción no se puede deshacer.`);
 }
 
+// Espejo (solo para mostrar) del cálculo del backend — semana laboral de 5
+// días, igual que en computeOperationalDailyNeed.
+function weeklyToDaily(amount: number, periodicity: Periodicity): number {
+  let weekly = amount;
+  if (periodicity === "DIARIO") weekly = amount * 5;
+  else if (periodicity === "MENSUAL") weekly = (amount * 12) / 52;
+  else if (periodicity === "ANUAL") weekly = amount / 52;
+  return weekly / 5;
+}
+
 // Pedido del usuario: "Renta, Nómina y Gastos puede poner en uno solo" —
 // una sola pantalla con pestañas, en vez de 3 entradas separadas en el menú.
 // Cada pestaña ahora tiene crear/editar/eliminar completos.
@@ -147,6 +157,7 @@ function RentaTab() {
           <p className="text-xl font-semibold text-blue-800">
             ${active.value.toLocaleString("es-MX")} <PeriodicityBadge value={active.periodicity} />
           </p>
+          <p className="text-xs text-blue-500 mt-1">≈ ${weeklyToDaily(active.value, active.periodicity).toFixed(2)}/día (semana de 5 días)</p>
         </Card>
       )}
 

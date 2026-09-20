@@ -17,6 +17,8 @@ export const financeService = {
   getDashboard: (date?: string) => api.get<DashboardSummary>(`/reports/dashboard${date ? `?date=${date}` : ""}`),
   getEvolution: (range: "week" | "month" | "history") =>
     api.get<{ range: string; series: import("../types/finance").EvolutionPoint[] }>(`/reports/evolution?range=${range}`),
+  getWeeklySummary: (weeks = 8) =>
+    api.get<{ weeks: import("../types/finance").WeekSummary[] }>(`/reports/weekly-summary?weeks=${weeks}`),
 
   // Ventas del día (manual, upsert por día — sección 2 de la corrección)
   getIncomeForDate: (date: string) => api.get<{ id: string; amount: number; notes?: string } | null>(`/income?date=${date}`),

@@ -85,6 +85,7 @@ export interface DashboardSummary {
   gananciaNeta: number;
   gastosOperativos: {
     rentaSemanal: number;
+    rentaDiaria: number;
     nominaSemanal: number;
     gastosFijosSemanal: number;
     gastosDiaSemanal: number;
@@ -100,6 +101,14 @@ export interface DashboardSummary {
     metaVencida: boolean;
     gananciaDiariaNecesaria: number;
   };
+}
+
+export interface WeekSummary {
+  weekStart: string;
+  weekEnd: string;
+  ventas: number;
+  gastos: number;
+  ganancia: number;
 }
 
 export interface EvolutionPoint {

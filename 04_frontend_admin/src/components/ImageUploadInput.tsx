@@ -21,40 +21,50 @@ export function ImageUploadInput({ value, onChange, label = "Foto", maxWidth = 9
 
   function handleFile(file: File) {
     setError(null);
-    if (!file.type.startsWith("image/")) {
-      setError("Selecciona un archivo de imagen (JPG, PNG, etc.)");
-      return;
-    }
     setLoading(true);
 
     const reader = new FileReader();
     reader.onload = () => {
       const img = new window.Image();
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
+        try {
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            setLoading(false);
+            setError("Tu navegador no pudo procesar esta imagen. Prueba con otra foto.");
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          onChange(dataUrl);
           setLoading(false);
-          setError("No se pudo procesar la imagen");
-          return;
+        } catch {
+          setLoading(false);
+          setError("No se pudo convertir esta imagen. Prueba guardándola como JPG o PNG primero.");
         }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        onChange(dataUrl);
-        setLoading(false);
       };
       img.onerror = () => {
         setLoading(false);
-        setError("No se pudo leer la imagen");
+        // Cualquier formato de imagen es aceptado, pero el navegador debe
+        // poder decodificarlo (JPG, PNG, GIF, WEBP, BMP sí; HEIC/HEIF de
+        // iPhone y algunos RAW normalmente no, fuera de Safari).
+        const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+        const likelyHeic = ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif";
+        setError(
+          likelyHeic
+            ? `El formato ${ext.toUpperCase()} (típico de fotos de iPhone) no es compatible con este navegador. Cambia el ajuste de la cámara a "Más compatible" o convierte la foto a JPG antes de subirla.`
+            : `No se pudo abrir este archivo como imagen (${file.type || "formato desconocido"}). Prueba con un JPG, PNG, GIF o WEBP.`
+        );
       };
       img.src = String(reader.result);
     };
     reader.onerror = () => {
       setLoading(false);
-      setError("No se pudo leer el archivo");
+      setError("No se pudo leer el archivo desde tu dispositivo. Intenta de nuevo.");
     };
     reader.readAsDataURL(file);
   }
